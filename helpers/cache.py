@@ -57,6 +57,8 @@ def cache_decorator(function, ignore_first=False):
             print(f'Reusing cache; key: {hashable}')
         return function.__cache__[hashable]
 
+    cached.original_function = function
+
     return cached
 
 

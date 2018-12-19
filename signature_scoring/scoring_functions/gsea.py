@@ -7,7 +7,8 @@ from methods.gsea import GSEADesktop
 from data_frames import AugmentedDataFrame
 from models import ExpressionProfile
 
-from ..profile import Profile
+from ..models import Profile
+from . import scoring_function
 
 GSEA_CACHE = None
 multiprocess_cache_manager.add_cache(globals(), 'GSEA_CACHE', 'dict')
@@ -28,6 +29,29 @@ class DummyExpressions(ExpressionProfile):
     @property
     def classes(self):
         return Series([self.case_name, self.control_name])
+
+
+def combine_gsea_results(disease_gene_sets, signature_gene_sets, na_action='fill_0'):
+
+    joined = disease_gene_sets.merge(
+        signature_gene_sets, suffixes=['_disease', '_signature'],
+        left_on=disease_gene_sets.index, right_on=signature_gene_sets.index,
+        how=('left' if na_action == 'fill_0' else 'inner')
+    )
+    joined = joined.set_index('key_0')
+
+    if na_action == 'fill_0':
+        joined = joined.fillna(0)
+
+    joined['score'] = (
+            1
+            -
+            (joined.nes_disease + joined.nes_signature) / joined.nes_disease
+            *
+            (1 - joined['fdr_q-val_disease']) * (1 - joined['fdr_q-val_disease'])
+    )
+
+    return joined
 
 
 def create_gsea_scorer(gsea_app=GSEADesktop, permutations=500, gene_sets='h.all', q_value_cutoff=0.1, na_action='fill_0', score='mean', normalization=True):
@@ -60,6 +84,7 @@ def create_gsea_scorer(gsea_app=GSEADesktop, permutations=500, gene_sets='h.all'
 
         return results[class_name], results['control']
 
+    @scoring_function
     def gsea_score(disease_profile: Profile, compound_profile: Profile):
         # theoretically this could be replaced with the original data (e.g. tumour/normal for TCGA),
         # though this would be less consistent with how the signature profile is handled and require
@@ -99,34 +124,7 @@ def create_gsea_scorer(gsea_app=GSEADesktop, permutations=500, gene_sets='h.all'
         disease_gene_sets = concat([disease_gene_sets_up, disease_gene_sets_dn])
         signature_gene_sets = concat([signature_gene_sets_up, signature_gene_sets_dn])
 
-        joined = disease_gene_sets.merge(
-            signature_gene_sets, suffixes=['_disease', '_signature'],
-            left_on=disease_gene_sets.index, right_on=signature_gene_sets.index,
-            how=('left' if na_action == 'fill_0' else 'inner')
-        )
-        joined = joined.set_index('key_0')
-        #from utilities_namespace import show_table
-        #show_table(joined)
-
-        if na_action == 'fill_0':
-            joined = joined.fillna(0)
-
-        if normalization:
-            joined['score'] = (
-                1
-                -
-                (joined.nes_disease + joined.nes_signature) / joined.nes_disease
-                *
-                (1 - joined['fdr_q-val_disease']) * (1 - joined['fdr_q-val_disease'])
-            )
-        else:
-            joined['score'] = (
-                1
-                -
-                (joined.es_disease + joined.es_signature) / joined.es_disease
-                *
-                (1 - joined['fdr_q-val_disease']) * (1 - joined['fdr_q-val_disease'])
-            )
+        joined = combine_gsea_results(disease_gene_sets, signature_gene_sets, na_action)
 
         return getattr(joined.score, score)()
 

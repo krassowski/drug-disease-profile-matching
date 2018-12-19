@@ -1,8 +1,8 @@
 from pandas import Series
 from pytest import approx
 
-from signature_scoring.profile import Profile
-from signature_scoring.profile import Signature
+from signature_scoring.models import Profile
+from signature_scoring.models import Signature
 from signature_scoring.scoring_functions.generic_scorers import score_spearman
 
 

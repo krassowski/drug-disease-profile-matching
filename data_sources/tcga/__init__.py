@@ -167,20 +167,26 @@ class ExpressionManager(LayerDataWithSubsets, ExpressionProfile):
             subset = self
         return subset[subset.columns[subset.classes == type_name]]
 
-    def differential(self, case_='tumor', control_='normal', metric=signal_to_noise, index_as_bytes=True,
-                     limit_to=None, only_paired=True, nans='fill_0'):
+    def split(self, case_='tumor', control_='normal', only_paired=True):
         if only_paired:
             paired = self.paired(case_, control_)
         else:
             paired = self
-        print(f'Metric: {metric.__name__}, groups: {case_}, {control_}')
         print(f'Using {len(paired.columns)} out of {len(self.columns)} samples')
 
         if paired.empty:
             return
 
-        case = paired[paired.columns[paired.classes == case_]]
-        control = paired[paired.columns[paired.classes == control_]]
+        cases = paired[paired.columns[paired.classes == case_]]
+        controls = paired[paired.columns[paired.classes == control_]]
+
+        return cases, controls
+
+    def differential(self, case_='tumor', control_='normal', metric=signal_to_noise, index_as_bytes=True,
+                     limit_to=None, only_paired=True, nans='fill_0'):
+        print(f'Metric: {metric.__name__}, groups: {case_}, {control_}')
+
+        case, control = self.split(case_, control_, only_paired)
         diff = []
 
         if case.empty or control.empty:

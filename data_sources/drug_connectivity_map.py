@@ -30,11 +30,7 @@ class DrugConnectivityMap(DataSource):
             sig_id: i
             for i, sig_id in enumerate(self.sig_index_vector)
         }
-
-    @property
-    @lru_cache()
-    def sig_info(self):
-        return read_table('data/lincs/GSE92742/GSE92742_Broad_LINCS_sig_info.txt.gz', low_memory=False)
+        self.sig_info = read_table('data/lincs/GSE92742/GSE92742_Broad_LINCS_sig_info.txt.gz', low_memory=False)
 
     def signatures_treated_with(self, substance: str, pert_id=False):
         return self.metadata_for_perturbation(substance, pert_id=pert_id).sig_id
@@ -264,13 +260,23 @@ class AggregatedScores(DataFrame):
 
 class Scores(UserDict):
 
-    def __init__(self, *args, **kwargs):
+    def __init__(self, *args, scores_for='sig_id', **kwargs):
         super().__init__(*args, **kwargs)
         self.df = DataFrame.from_dict(dict(self), orient='index', columns=['score'])
         self.merged = self.df.merge(
             dcm.sig_info,
-            left_on=self.df.index, right_on=dcm.sig_info.sig_id
+            left_on=self.df.index, right_on=dcm.sig_info[scores_for]
         ).drop(['key_0', 'distil_id'], axis='columns')
+
+    @classmethod
+    def from_grouped_signatures(cls, data):
+        per_single_signature = {}
+        for signature_ids, score in data:
+            for signature_id in signature_ids:
+                if not score:
+                    continue
+                per_single_signature[signature_id] = score
+        return cls(per_single_signature)
 
     def __add__(self, other):
         return Scores({**self, **other})
@@ -351,5 +357,32 @@ class SignaturesData(MyDataFrame):
 
         return self.progress_apply(diff, axis=0)
 
+    def classes(self, class_type='pert_iname'):
+        metadata = dcm.sig_info[dcm.sig_info.sig_id.isin(self.columns)]
+        return metadata[class_type]
+
+    @property
+    def metadata(self):
+        return dcm.sig_info[dcm.sig_info.sig_id.isin(self.columns)]
+
+    def members_of_class(self, class_name, class_type='pert_iname', cell_line=None):
+        metadata = self.metadata
+        if cell_line:
+            metadata = metadata[metadata['cell_id'] == cell_line]
+        return metadata[metadata[class_type] == class_name].sig_id
+
 
 dcm = DrugConnectivityMap()
+
+
+@lru_cache()
+def get_controls_for_signatures(ids, genes_to_keep=None):
+    controls_by_signature = {}
+    for signature_id in ids:
+        controls = dcm.get_controls(signature_id, exemplar_only=True)
+        if genes_to_keep is not None:
+            rows_to_keep = controls.index.isin(genes_to_keep)
+            controls = controls[rows_to_keep]
+        control = controls.mean(axis=1)
+        controls_by_signature[signature_id] = control
+    return DataFrame(controls_by_signature)

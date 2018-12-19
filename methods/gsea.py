@@ -65,6 +65,18 @@ class GSEA:
                 return
 
 
+class GeneSet:
+
+    def __init__(self, name, genes):
+        self.name = name
+        self.genes = set(genes)
+
+    @classmethod
+    def from_gmt_line(cls, line):
+        name, url, *ids = line.split()
+        return cls(name, ids)
+
+
 class MolecularSignaturesDatabase:
     def __init__(self, version='6.2'):
         self.path = Path('data/msigdb')
@@ -76,7 +88,7 @@ class MolecularSignaturesDatabase:
         ]
 
     def parse_name(self, name):
-        parsed = re.match(f'(?P<name>.*?)\.v{self.version}\.(?P<id_type>(entrez|symbols)).gmt', name)
+        parsed = re.match(rf'(?P<name>.*?)\.v{self.version}\.(?P<id_type>(entrez|symbols)).gmt', name)
         return parsed.groupdict()
 
     def resolve(self, gene_sets, id_type):
@@ -85,6 +97,15 @@ class MolecularSignaturesDatabase:
             return str(path)
         else:
             raise ValueError('Unknown library!')
+
+    def load(self, gene_sets, id_type):
+        path = self.resolve(gene_sets=gene_sets, id_type=id_type)
+
+        with open(path) as f:
+            return {
+                GeneSet.from_gmt_line(line)
+                for line in f
+            }
 
 
 class GSEADesktop(GSEA):

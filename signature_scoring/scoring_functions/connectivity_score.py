@@ -2,7 +2,8 @@ from numpy import sign
 
 from helpers.inline import inline, compile_with_inline, inline_if_else
 
-from signature_scoring.profile import Profile
+from ..models import Profile
+from . import scoring_function
 
 
 def kolmogorov_smirnov(ranks_disease, ranks_compound):
@@ -147,4 +148,6 @@ def create_scorer(negative, statistic=kolmogorov_smirnov, ranks_type='signature'
         '_' + statistic.__name__ +
         '_' + compose_tags.__name__
     )
-    return compile_with_inline(connectivity_score, name, locals(), globals())
+    return scoring_function(
+        compile_with_inline(connectivity_score, name, locals(), globals())
+    )

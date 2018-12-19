@@ -1,7 +1,7 @@
 from pandas import Series, DataFrame
 
 from signature_scoring import score_signatures
-from signature_scoring.profile import Profile
+from signature_scoring.models import Profile
 from signature_scoring.scoring_functions.connectivity_score import create_scorer
 
 

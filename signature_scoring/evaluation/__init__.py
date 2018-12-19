@@ -1,9 +1,10 @@
 from types import FunctionType
+from typing import Dict
 
 import numpy
 from functools import partial
 
-from pandas import concat, DataFrame
+from pandas import DataFrame
 from operator import attrgetter
 
 from data_sources.drug_connectivity_map import Scores, dcm
@@ -12,6 +13,7 @@ from helpers.cache import cache_decorator
 from helpers import WarningManager
 
 from .. import score_signatures
+from ..models import SignaturesGrouping
 from .scores_models import ScoresVector, ProcessedScores, TopScores
 from .metrics import EvaluationMetric, metrics_manager
 
@@ -78,8 +80,7 @@ def evaluation_summary(scores_dict, top, aggregate, ScoresVector=ScoresVector, t
 
 
 #@cache_decorator
-def calculate_scores(query_signature, signatures_map, fold_changes, **kwargs):
-    scoring_func = kwargs.pop('scoring_func')
+def calculate_scores(query_signature, signatures_map, scoring_func, fold_changes, **kwargs):
     score = partial(
         score_signatures,
         scoring_func, query_signature,
@@ -101,9 +102,13 @@ def calculate_scores(query_signature, signatures_map, fold_changes, **kwargs):
     return scores_dict
 
 
-def select_cells(signatures_map, completeness_ratio: float):
-    all_signatures = concat(signatures_map.values(), sort=False)
-    all_data = dcm.sig_info[dcm.sig_info.sig_id.isin(all_signatures.columns)]
+def select_cells(signatures_map: Dict[str, SignaturesGrouping], completeness_ratio: float):
+    all_signatures = {
+        signature
+        for grouping in signatures_map.values()
+        for signature in grouping.signature_ids
+    }
+    all_data = dcm.sig_info[dcm.sig_info.sig_id.isin(all_signatures)]
     count_by_cell = all_data.drop_duplicates(['cell_id', 'pert_iname']).groupby('cell_id').count().pert_iname
 
     all_substances_and_controls_cnt = len(set(all_data.pert_iname))
@@ -115,8 +120,8 @@ def select_cells(signatures_map, completeness_ratio: float):
         cell
         for cell in selected_cells
         if all(
-            cell in set(all_data[all_data.sig_id.isin(signatures.columns)].cell_id)
-            for signatures in signatures_map.values()
+            cell in set(all_data[all_data.sig_id.isin(grouping.signature_ids)].cell_id)
+            for grouping in signatures_map.values()
         )
     }
     return selected_cells
@@ -156,9 +161,10 @@ def summarize_across_cell_lines(summarize_test: FunctionType, scores_dict_by_cel
 
 
 def evaluate(
-    query_signature, indications_signatures, contraindications_signatures, control_signatures=None,
-    aggregate='mean_per_substance_dose_and_cell', top='rescaled', cell_lines_ratio=0.9,
-    summary='per_cell_line_combined', fold_changes=False, reset_warnings=True, **kwargs
+    scoring_func, query_signature, indications_signatures, contraindications_signatures,
+    control_signatures=None, aggregate='mean_per_substance_dose_and_cell', top='rescaled',
+    cell_lines_ratio=0.9, summary='per_cell_line_combined', fold_changes=False,
+    reset_warnings=True, **kwargs
 ):
     """
     aggregate: mean_per_substance, best_per_substance, signal_to_noise
@@ -177,9 +183,11 @@ def evaluate(
             print('Skipping controls as those will be used for fold_change calculation')
             del signatures_map['control']
 
+    collection = scoring_func.collection
+
     # remove signatures which were not given
-    signatures_map = {
-        label: signatures
+    signatures_map: Dict[str, SignaturesGrouping] = {
+        label: collection(signatures)
         for label, signatures in signatures_map.items()
         if signatures is not None
     }
@@ -197,16 +205,17 @@ def evaluate(
         )
 
         for name, signatures in signatures_map.items():
-            signatures_data = dcm.sig_info[dcm.sig_info.sig_id.isin(signatures.columns)]
+            signatures_data = dcm.sig_info[dcm.sig_info.sig_id.isin(signatures.signature_ids)]
             signatures_to_keep = set(signatures_data[signatures_data.cell_id.isin(selected_cells)].sig_id)
-            signatures_map[name] = signatures.drop(
-                columns=[column for column in signatures.columns if column not in signatures_to_keep])
+            signatures_map[name] = signatures.drop_signatures(
+                [column for column in signatures.signature_ids if column not in signatures_to_keep]
+            )
 
-    scores_dict = calculate_scores(query_signature, signatures_map, fold_changes, **kwargs)
+    scores_dict = calculate_scores(query_signature, signatures_map, scoring_func, fold_changes, **kwargs)
 
     summarize_test = partial(evaluation_summary, top=top, aggregate=aggregate)
 
-    if cell_lines_ratio and summary == 'per_cell_line_combined':
+    if cell_lines_ratio and summary == 'per_cell_line_combined' and not scoring_func.grouping:
         scores_dict_by_cell = {}
 
         for cell_id in selected_cells:

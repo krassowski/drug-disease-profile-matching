@@ -1,13 +1,11 @@
-from functools import lru_cache
 from typing import Tuple
 
 import numpy as np
-from pandas import DataFrame, Series
+from pandas import Series
 
-from data_sources.drug_connectivity_map import dcm
+from data_sources.drug_connectivity_map import get_controls_for_signatures
 
-from .processor import progress_bar
-from signature_scoring.profile import Signature
+from ..models import Signature
 from .processor import SignatureProcessor
 
 
@@ -48,18 +46,8 @@ class FoldChangeSignatureProcessor(SignatureProcessor):
 
     def controls(self, selected_genes):
         # sorted tuples to get hashable inputs for caching
-        return self.get_controls_for_signatures(
+        return get_controls_for_signatures(
             tuple(sorted(self.ids)),
             tuple(sorted(selected_genes))
         )
 
-    @lru_cache()
-    def get_controls_for_signatures(self, ids, genes_to_keep):
-        controls_by_signature = {}
-        for signature_id in progress_bar(ids):
-            controls = dcm.get_controls(signature_id, exemplar_only=True)
-            rows_to_keep = controls.index.isin(genes_to_keep)
-            controls = controls[rows_to_keep]
-            control = controls.mean(axis=1)
-            controls_by_signature[signature_id] = control
-        return DataFrame(controls_by_signature)

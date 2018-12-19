@@ -31,3 +31,9 @@ def on_division_by_zero(fill_with):
         decorated.__name__ = function.__name__
         return decorated
     return closure
+
+
+def coerce(obj, new_type):
+    if not isinstance(obj, new_type):
+        return new_type(obj)
+    return obj

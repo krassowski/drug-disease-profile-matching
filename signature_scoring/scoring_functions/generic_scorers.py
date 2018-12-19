@@ -1,9 +1,11 @@
 from pandas import concat
 from scipy.stats import spearmanr
 
-from ..profile import Profile, ScoringInput
+from ..models import Profile, ScoringInput
+from . import scoring_function
 
 
+@scoring_function
 def score_spearman(disease_profile: Profile, compound_profile: Profile):
 
     down_ranks = compound_profile.top.down.index
@@ -20,6 +22,7 @@ def score_spearman(disease_profile: Profile, compound_profile: Profile):
     return s_dn + s_up
 
 
+@scoring_function
 def score_spearman_max(disease_profile: Profile, compound_profile: Profile):
 
     down_ranks = compound_profile.top.down.index
@@ -46,6 +49,7 @@ def changed_subsets(disease: ScoringInput, compound: ScoringInput):
     return changed_by_compound_series, x_down_in_disease, x_up_in_disease
 
 
+@scoring_function
 def x_sum(disease_profile: Profile, compound_profile: Profile):
     """Algorithm:
 
@@ -76,6 +80,7 @@ def x_sum(disease_profile: Profile, compound_profile: Profile):
     )
 
 
+@scoring_function
 def x_sum_max(disease_profile: Profile, compound_profile: Profile):
 
     changed_by_compound, x_down_in_disease, x_up_in_disease = changed_subsets(
@@ -88,6 +93,7 @@ def x_sum_max(disease_profile: Profile, compound_profile: Profile):
     ])
 
 
+@scoring_function
 def x_product(disease_profile: Profile, compound_profile: Profile):
 
     changed_by_compound, x_down_in_disease, x_up_in_disease = changed_subsets(
@@ -103,6 +109,7 @@ def x_product(disease_profile: Profile, compound_profile: Profile):
     )
 
 
+@scoring_function
 def x_product_max(disease_profile: Profile, compound_profile: Profile):
 
     changed_by_compound, x_down_in_disease, x_up_in_disease = changed_subsets(
