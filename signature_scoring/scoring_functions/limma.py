@@ -1,5 +1,4 @@
 from pandas import DataFrame
-from rpy2.rinterface import RRuntimeError
 from rpy2.robjects import r, globalenv
 from rpy2.robjects import StrVector, ListVector
 from rpy2.robjects.packages import importr
@@ -22,7 +21,6 @@ def roast(expression: ExpressionWithControls, gene_sets: str):
     if key in LIMMA_CACHE:
         return LIMMA_CACHE[key]
 
-    # TODO: start new R environment? Seems difficult if not impossible.
     joined = DataFrame(expression.joined)
     joined.index = joined.index.astype(str)
 
@@ -34,9 +32,11 @@ def roast(expression: ExpressionWithControls, gene_sets: str):
     globalenv['expression'] = joined
     globalenv['expression_classes'] = expression.classes.loc[~nulls.reset_index(drop=True)]
 
+    # TODO: paired samples for cell lines?
     result = r(f"""
     expression_set = ExpressionSet(assayData=data.matrix(expression))
-    design = model.matrix(~expression_classes)
+
+    design = cbind(intercept=1, controlVsCondition=expression_classes != 'normal')
     result = mroast(expression_set, {gene_sets}, design, geneid=dimnames(expression)[[1]])
     rows = rownames(result)
     result
@@ -46,7 +46,7 @@ def roast(expression: ExpressionWithControls, gene_sets: str):
     r('rm(expression_set, design, expression, result, rows); gc()')
 
     result = result.rename({'FDR': 'fdr_q-val'}, axis=1)
-    result['nes'] = result[['PropUp', 'PropDown']].max(axis=1)  # times NGenes to normalize?
+    result['nes'] = result[['PropUp', 'PropDown']].max(axis=1) * result.Direction.map({'Up': 1, 'Down': -1})
     LIMMA_CACHE[key] = result
     return result
 
@@ -66,6 +66,10 @@ def create_roast_scorer(
 
     def roast_score(disease: ExpressionWithControls, compound: ExpressionWithControls):
         multiprocess_cache_manager.respawn_cache_if_needed()
+
+        if len(compound.cases.columns) < 2 or len(compound.controls.columns) < 2:
+            print(f'Skipping {compound} not enough degrees o freedom (no way to compute in-group variance)')
+            return None
 
         disease_gene_sets = roast(disease, gene_sets=gene_sets)
         disease_gene_sets.drop(disease_gene_sets[disease_gene_sets['fdr_q-val'] > q_value_cutoff].index, inplace=True)

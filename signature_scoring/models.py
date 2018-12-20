@@ -79,6 +79,7 @@ class TCGAExpressionWithControls(ExpressionWithControls, ExpressionManager):
 
     @property
     def joined(self):
+
         return self
 
 
@@ -96,7 +97,7 @@ class SignaturesWithControls(ExpressionWithControls, AugmentedDataFrame):
 
     @property
     def classes(self):
-        return Series(['case'] * len(self.cases.columns) + ['control'] * len(self.controls.columns))
+        return Series(['case'] * len(self.cases.columns) + ['normal'] * len(self.controls.columns))
 
     @property
     def joined(self):
