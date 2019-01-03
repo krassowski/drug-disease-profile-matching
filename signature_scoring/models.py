@@ -21,7 +21,7 @@ class Signature(AugmentedSeries):
         return down_regulated, up_regulated
 
 
-class ScoringInput:
+class ScoringData:
 
     up: Series
     down: Series
@@ -34,25 +34,42 @@ class ScoringInput:
             self.ranks = concat([self.up, self.down]).rank(ascending=False)
         else:
             self.ranks = signature.rank(ascending=False)
+        self._hashable = tuple(tuple(component.items()) for component in [self.up, self.down, self.ranks])
 
     @property
     def genes(self) -> set:
         return {*self.down.index, *self.up.index}
 
+    @property
+    def hashable(self):
+        return self._hashable
 
-class Profile:
 
-    top: ScoringInput
-    full: ScoringInput
+class ScoringInput(ABC):
+
+    @property
+    @abstractmethod
+    def hashable(self):
+        pass
+
+
+class Profile(ScoringInput):
+
+    top: ScoringData
+    full: ScoringData
 
     def __init__(self, signature: Signature, limit=None, **kwargs):
         if not isinstance(signature, Signature):
             signature = Signature(signature)
-        self.top = ScoringInput(signature, limit, **kwargs)
-        self.full = ScoringInput(signature, **kwargs)
+        self.top = ScoringData(signature, limit, **kwargs)
+        self.full = ScoringData(signature, **kwargs)
+
+    @property
+    def hashable(self):
+        return self.top.hashable, self.full.hashable
 
 
-class ExpressionWithControls:
+class ExpressionWithControls(ScoringInput):
     # TODO: make both Profile and ExpressionWithControls inherit from same base
     #  and have a limit() method (to trim the data to the most relevant genes only)
 
@@ -63,6 +80,11 @@ class ExpressionWithControls:
 
     def __repr__(self):
         return f'<{self.__class__.__name__}: {len(self.cases.columns)} cases, {len(self.controls.columns)} controls>'
+
+    @property
+    def hashable(self):
+        all_data = self.joined
+        return tuple(all_data.index), tuple(all_data.columns), all_data.sum().sum()
 
 
 class TCGAExpressionWithControls(ExpressionWithControls, ExpressionManager):

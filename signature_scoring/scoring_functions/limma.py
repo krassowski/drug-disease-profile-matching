@@ -1,4 +1,5 @@
 from pandas import DataFrame
+from rpy2.rinterface._rinterface import RRuntimeError
 from rpy2.robjects import r, globalenv
 from rpy2.robjects import StrVector, ListVector
 from rpy2.robjects.packages import importr
@@ -17,7 +18,7 @@ multiprocess_cache_manager.add_cache(globals(), 'LIMMA_CACHE', 'dict')
 
 
 def roast(expression: ExpressionWithControls, gene_sets: str):
-    key = (tuple(expression.index), tuple(expression.columns), expression.sum().sum())
+    key = (expression.hashable, gene_sets)
     if key in LIMMA_CACHE:
         return LIMMA_CACHE[key]
 
@@ -71,12 +72,16 @@ def create_roast_scorer(
             print(f'Skipping {compound} not enough degrees o freedom (no way to compute in-group variance)')
             return None
 
-        disease_gene_sets = roast(disease, gene_sets=gene_sets)
-        disease_gene_sets.drop(disease_gene_sets[disease_gene_sets['fdr_q-val'] > q_value_cutoff].index, inplace=True)
+        try:
+            disease_gene_sets = roast(disease, gene_sets=gene_sets)
+            disease_gene_sets.drop(disease_gene_sets[disease_gene_sets['fdr_q-val'] > q_value_cutoff].index, inplace=True)
 
-        signature_gene_sets = roast(compound, gene_sets=gene_sets)
+            signature_gene_sets = roast(compound, gene_sets=gene_sets)
 
-        joined = combine_gsea_results(disease_gene_sets, signature_gene_sets, na_action)
-        return joined.score.mean()
+            joined = combine_gsea_results(disease_gene_sets, signature_gene_sets, na_action)
+            return joined.score.mean()
+        except RRuntimeError:
+            print(compound)
+            return None
 
     return scoring_function(roast_score, input=ExpressionWithControls, grouping=grouping)

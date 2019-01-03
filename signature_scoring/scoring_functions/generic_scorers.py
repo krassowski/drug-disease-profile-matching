@@ -1,7 +1,7 @@
 from pandas import concat
 from scipy.stats import spearmanr
 
-from ..models import Profile, ScoringInput
+from ..models import Profile, ScoringData
 from . import scoring_function
 
 
@@ -39,7 +39,7 @@ def score_spearman_max(disease_profile: Profile, compound_profile: Profile):
     return max([s_dn, s_up])
 
 
-def changed_subsets(disease: ScoringInput, compound: ScoringInput):
+def changed_subsets(disease: ScoringData, compound: ScoringData):
     changed_by_compound_series = concat([compound.down, compound.up])
     changed_by_compound = set(changed_by_compound_series.index)
 
