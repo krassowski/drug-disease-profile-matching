@@ -4,6 +4,8 @@ from statistics import mean
 from pandas import read_table
 from pyfaidx import Fasta
 
+from config import DATA_DIR
+
 
 class ProteinSequences:
     """Implemented with Uniprot"""
@@ -16,7 +18,7 @@ class ProteinSequences:
         self.fasta = Fasta(file, key_function=extract_id)
 
         id_mapping = read_table(
-            'data/uniprot/HUMAN_9606_idmapping.dat.gz',
+            DATA_DIR + '/uniprot/HUMAN_9606_idmapping.dat.gz',
             names=['uniprot_id', 'type', 'value']
         )
         gene_mappings = id_mapping[

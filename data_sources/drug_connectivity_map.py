@@ -3,6 +3,7 @@ from functools import lru_cache
 from pandas import read_table, DataFrame, Series, concat
 from tqdm import tqdm
 
+from config import DATA_DIR
 from data_frames import MyDataFrame
 from data_sources.data_source import DataSource
 from h5py import File
@@ -20,17 +21,19 @@ class PerturbationProfile(ExpressionProfile):
 class DrugConnectivityMap(DataSource):
 
     def __init__(self):
-        CMAP_PATH = 'data/lincs/GSE92742/GSE92742_Broad_LINCS_Level5_COMPZ.MODZ_n473647x12328.gctx'
+        dataset_path = DATA_DIR + '/lincs/GSE92742'
+
+        CMAP_PATH = dataset_path + '/GSE92742_Broad_LINCS_Level5_COMPZ.MODZ_n473647x12328.gctx'
         self.cmap_file = File(CMAP_PATH, mode='r')
         self.cmap = self.cmap_file['0']
-        self.cell_info = read_table('data/lincs/GSE92742/GSE92742_Broad_LINCS_cell_info.txt.gz', low_memory=False)
-        self.sig_metrics = read_table('data/lincs/GSE92742/GSE92742_Broad_LINCS_sig_metrics.txt.gz')
+        self.cell_info = read_table(dataset_path + '/GSE92742_Broad_LINCS_cell_info.txt.gz', low_memory=False)
+        self.sig_metrics = read_table(dataset_path + '/GSE92742_Broad_LINCS_sig_metrics.txt.gz')
         self.sig_index_vector = self.meta['COL']['id'].value
         self.sig_index = {
             sig_id: i
             for i, sig_id in enumerate(self.sig_index_vector)
         }
-        self.sig_info = read_table('data/lincs/GSE92742/GSE92742_Broad_LINCS_sig_info.txt.gz', low_memory=False)
+        self.sig_info = read_table(dataset_path + '/GSE92742_Broad_LINCS_sig_info.txt.gz', low_memory=False)
 
     def signatures_treated_with(self, substance: str, pert_id=False):
         return self.metadata_for_perturbation(substance, pert_id=pert_id).sig_id

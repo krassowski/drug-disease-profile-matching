@@ -6,6 +6,7 @@ from warnings import warn
 import numpy
 from pandas import concat, read_table, Series
 
+from config import DATA_DIR
 from data_sources.data_source import DataSource
 
 from metrics import signal_to_noise
@@ -216,7 +217,7 @@ class TCGA(DataSource):
     
     # 'clinical', 'rnaseq', 'mutations', 'RPPA', 'mRNA', 'miRNASeq', 'methylation', 'isoforms'
 
-    path = 'data/tcga'
+    path = DATA_DIR + '/tcga'
 
     def add_participant_column(self, df: Union[Layer, LayerData], column: str= 'tumor_sample_barcode'):
         if 'participant' not in df.columns:
@@ -228,7 +229,7 @@ class TCGA(DataSource):
 
     def clinical(self, cancer_type, mode='simple') -> Layer:
         clinical_data = read_table(
-            f'data/tcga/gdac.broadinstitute.org_'
+            f'{DATA_DIR}/tcga/gdac.broadinstitute.org_'
             f'{cancer_type}.Clinical_Pick_Tier1.Level_4.2016012800.0.0/'
             + (
                 f'{cancer_type}.clin.merged.picked.txt'

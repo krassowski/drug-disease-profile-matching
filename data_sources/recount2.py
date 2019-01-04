@@ -1,5 +1,6 @@
 from pandas import read_table, concat
 
+from config import DATA_DIR
 from data_sources.data_source import DataSource
 from data_sources.sra import SRAExpressionLayer
 from layers import ExpressionLayer
@@ -16,7 +17,7 @@ class Recount2(DataSource):
         expressions = {}
         for study in studies:
             expressions[study] = read_table(
-                f'data/recount2/{study}.tsv.gz'
+                DATA_DIR + f'/recount2/{study}.tsv.gz'
             ).set_index('gene_id')
         df = concat(
             expressions.values(),

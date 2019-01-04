@@ -6,6 +6,7 @@ from tempfile import TemporaryDirectory, NamedTemporaryFile
 from pathlib import Path
 from warnings import warn
 
+from config import DATA_DIR
 from models import ExpressionProfile
 
 
@@ -79,7 +80,7 @@ class GeneSet:
 
 class MolecularSignaturesDatabase:
     def __init__(self, version='6.2'):
-        self.path = Path('data/msigdb')
+        self.path = Path(DATA_DIR + '/msigdb')
         self.version = version
         wildcard_path = str((self.path / f'*.v{self.version}.*.gmt').resolve())
         self.gene_sets = [

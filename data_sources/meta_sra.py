@@ -1,9 +1,11 @@
 from pronto import Ontology
 from pandas import read_json, read_table, Series, DataFrame
+
+from config import DATA_DIR
 from data_frames import MyDataFrame
 from collections import Counter
 from helpers.cache import cached_property
-from gui_helpers import HorizontalNamespace
+from helpers.gui.namespace import HorizontalNamespace
 from helpers.mathtools import identity
 from itertools import permutations
 from functools import lru_cache
@@ -15,7 +17,7 @@ from numpy import nan
 
 class SRAAccessionsMap:
     
-    def __init__(self, path='data/sra/SRA_Accessions.tab.xz'):
+    def __init__(self, path=DATA_DIR + '/sra/SRA_Accessions.tab.xz'):
         self.path = path
         self.head = read_table(path, nrows=10)#, skiprows=25000)
         self.columns = self.head.columns
@@ -84,15 +86,15 @@ class MetaSRA(MyDataFrame):
     
     ontologies_data = {
         # uberon
-        'anatomy': ('data/uberon/uberon.owl', identity),
+        'anatomy': (DATA_DIR + '/uberon/uberon.owl', identity),
         # disease_ontology
-        'disease': ('data/disaese_ontology/HumanDO.owl', identity),
+        'disease': (DATA_DIR + '/disaese_ontology/HumanDO.owl', identity),
         # efo
-        'experimental_factor': ('data/efo/efo.owl', identity),
+        'experimental_factor': (DATA_DIR + '/efo/efo.owl', identity),
         # cvcl
-        'cellosaurus': ('data/cvcl/cellosaurus.obo', lambda i: i.replace(':', '_')),
+        'cellosaurus': (DATA_DIR + '/cvcl/cellosaurus.obo', lambda i: i.replace(':', '_')),
         # cell ontology
-        'cell': ('data/cl/cl.owl', identity)
+        'cell': (DATA_DIR + '/cl/cl.owl', identity)
     }
     
     _metadata = ['ontologies_data', 'accessions_map']

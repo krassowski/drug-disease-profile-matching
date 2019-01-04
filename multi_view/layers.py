@@ -4,6 +4,7 @@ from pandas import DataFrame, Series, concat, merge
 from sklearn.preprocessing import minmax_scale
 
 from bio.protein_sequences import ProteinSequences
+from config import DATA_DIR
 from data_frames import AugmentedDataFrame
 
 
@@ -161,7 +162,7 @@ class ExpressionLayer(Layer):
     pass
     
 
-protein_sequences = ProteinSequences('data/uniprot/uniprot_sprot.fasta')
+protein_sequences = ProteinSequences(DATA_DIR + '/uniprot/uniprot_sprot.fasta')
 
 from numpy import nan
 
