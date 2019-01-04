@@ -13,7 +13,7 @@ Base = generic_repr(automap_base(metadata=m))
 
 
 def _repr_html_(self):
-    from gui_helpers import HorizontalNamespace
+    from helpers.gui.namespace import HorizontalNamespace
     data = {
         k: v
         for k, v in self.__dict__.items()
