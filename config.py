@@ -1,1 +1,1 @@
-DATA_DIR = 'data'
+DATA_DIR = '/home/ubuntu/data/drug_repositioning'

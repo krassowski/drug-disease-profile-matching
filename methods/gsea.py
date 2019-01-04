@@ -1,8 +1,10 @@
 import re
 from glob import glob
+from copy import copy
 
 from pandas import read_csv, read_table
 from tempfile import TemporaryDirectory, NamedTemporaryFile
+from os import makedirs
 from pathlib import Path
 from warnings import warn
 
@@ -28,7 +30,6 @@ class GSEA:
             classes = f.name
 
         with NamedTemporaryFile('w', delete=False, suffix='.txt') as f:
-            from copy import copy
             expression_data = copy(expression_data)
             columns = expression_data.columns
             expression_data['DESCRIPTION'] = 'na'
@@ -117,7 +118,8 @@ class GSEADesktop(GSEA):
         self.memory_size = memory_size
 
     def core_command(self):
-        return str(self.path) + ' -cp thirdparty/gsea-3.0.jar'
+        pwd = Path().absolute().parent
+        return str(self.path) + f' -cp {pwd}/thirdparty/gsea-3.0.jar'
 
     def load_results(self, outdir, name, expression_data):
         timestamps = []
@@ -188,11 +190,17 @@ class GSEADesktop(GSEA):
 
         with TemporaryDirectory() as temp_dir:
             if not outdir:
-                outdir = temp_dir
-            outdir = Path(outdir)
+                outdir = Path(temp_dir)
+            else:
+                outdir = Path(outdir)
+                if not outdir.is_absolute():
+                    pwd = Path().absolute().parent
+                    outdir = pwd / str(outdir)
+                makedirs(outdir, exist_ok=True)
+
             command += (
-                f" -res {data_path}"
-                f" -cls {classes_path}"
+                f' -res {data_path}'
+                f' -cls {classes_path}'
                 f' -gmx {gene_sets}'
                 f" -collapse false -mode {mode} -norm {normalization}"
                 f" -nperm {permutations} -permute {permutation_type} -rnd_type no_balance"
@@ -205,7 +213,7 @@ class GSEADesktop(GSEA):
                 " -save_rnd_lists false"
                 " -set_max 500 -set_min 15"
                 " -zip_report false"
-                f" -out {outdir}"
+                f' -out {outdir}'
                 " -gui false"
             )
             if verbose:

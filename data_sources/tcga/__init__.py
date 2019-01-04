@@ -5,6 +5,7 @@ from warnings import warn
 
 import numpy
 from pandas import concat, read_table, Series
+from rpy2.rinterface import RRuntimeError
 
 from config import DATA_DIR
 from data_sources.data_source import DataSource
@@ -19,7 +20,11 @@ from layers_data import LayerData, LayerDataWithSubsets, Subset, MutationAnnotat
 
 from .barcode import TCGABarcode
 
-firebrowse_r = importr('FirebrowseR')
+
+try:
+    firebrowse_r = importr('FirebrowseR')
+except RRuntimeError:
+    warn('No firebrowse_r found')
 
 
 def download_with_firebrowser(method, page_size=2000, **kwargs):

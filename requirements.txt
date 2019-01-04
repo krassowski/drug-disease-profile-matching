@@ -32,3 +32,5 @@ snakeviz
 scikit-plot
 git+https://github.com/althonos/pronto.git
 pytest
+statsmodels
+dataclasses

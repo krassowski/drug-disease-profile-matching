@@ -142,11 +142,16 @@ class ExpressionLayer(Layer):
     pass
 
 
-protein_sequences = ProteinSequences(DATA_DIR + '/uniprot/uniprot_sprot.fasta')
+protein_sequences = None
 
 
 # if not hierarchy I can always refactor to mixins for more flexibility
 class CodingMutationLayer(MutationLayer):
+
+    def __init__(self, sequences_path=DATA_DIR + '/uniprot/uniprot_sprot.fasta'):
+        global protein_sequences
+        if not protein_sequences:
+            protein_sequences = ProteinSequences(sequences_path)
 
     def normalize_by_protein_length(self, recover=True):
 
