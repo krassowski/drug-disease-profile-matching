@@ -26,17 +26,8 @@ def _repr_html_(self):
 
 Base._repr_html_ = _repr_html_
 
-# mkdir data/drugcentral
-# mv /home/krassowski/Downloads/drugcentral.dump.08262018.sql.gz data/drugcentral
-# sudo su - postgres -c 'createdb -T template0 drugcentral'
-# sudo su - postgres -c 'gunzip -c /home/krassowski/drug_discovery/data/drugcentral/drugcentral.dump.08262018.sql.gz | psql drugcentral'
-# sudo su - postgres -c 'createuser drugcentral -w'
-# sudo -u postgres psql
-# grant all privileges on database drugcentral to drugcentral;
-# alter user drugcentral with encrypted password password;
-# \c drugcentral
-# GRANT USAGE ON SCHEMA public TO drugcentral;
-# GRANT ALL PRIVILEGES ON ALL TABLES IN SCHEMA public TO drugcentral;
+# ./data/drugcentral/download.sh
+# ./data/drugcentral/install.sh
 engine = create_engine("postgresql+psycopg2://drugcentral:password@localhost/drugcentral")
 
 m.reflect(engine, views=True)
