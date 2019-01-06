@@ -3,6 +3,8 @@
 # Created by: krassowski
 # Created on: 20/12/18
 
+source("http://bioconductor.org/biocLite.R")
+biocLite("BiocUpgrade")
 if (!requireNamespace("BiocManager", quietly = TRUE))
     install.packages("BiocManager")
 BiocManager::install("GSVA", version = "3.8")
