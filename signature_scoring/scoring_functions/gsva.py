@@ -64,13 +64,22 @@ def gsva(expression: Union[ExpressionWithControls, Profile], gene_sets: str, met
     phenoData = AnnotatedDataFrame(data=as.data.frame(as.table(design)))
     row.names(phenoData) = colnames(expression)
     expression_set = ExpressionSet(assayData=data.matrix(expression), phenoData=phenoData)
-    #  geneid=dimnames(expression)[[1]]
-    result = gsva(exprs(expression_set), {gene_sets}, method='{method}', verbose=F, parallel.sz=1)
+
+    # transform to named list from GeneSetCollection class object
+    geneSets <- geneIds({gene_sets})
+
+    expressions <- exprs(expression_set)
+    genesInExpressionData <- rownames(expressions)
+    overlaps <- sapply(geneSets, function(genes) genes[genes %in% genesInExpressionData])
+    subset <- overlaps[sapply(overlaps, function(genes) length(genes) > 1)]
+
+    result = gsva(expressions, subset, method='{method}', verbose=F, parallel.sz=1)
 
     gene_sets = rownames(result)
     samples = colnames(result)
     result
     """)
+
     rows = r['gene_sets']
     if single_sample:
         columns = r['samples']
@@ -125,7 +134,9 @@ def create_gsva_scorer(
         joined = combine_gsea_results(disease_gene_sets, signature_gene_sets, na_action)
         return joined.score.mean()
 
-    if single_sample:
-        gsva_score.__name__ += '_single_sample'
+    gsva_score.__name__ = (
+        method +
+        ('_single_sample' if single_sample else '')
+    )
 
     return scoring_function(gsva_score, input=input, grouping=grouping)
