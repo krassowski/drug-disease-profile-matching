@@ -43,6 +43,9 @@ def combine_gsea_results(disease_gene_sets, signature_gene_sets, na_action='fill
     if na_action == 'fill_0':
         joined = joined.fillna(0)
 
+    if (joined.nes_disease == 0).any():
+        warn('ES in disease is 0, this will lead to inf scores!')
+
     joined['score'] = (
             1
             -
