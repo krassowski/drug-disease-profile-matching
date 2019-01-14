@@ -1,3 +1,4 @@
+from pathlib import Path
 from typing import Union
 from warnings import warn
 
@@ -66,89 +67,18 @@ def gsva(expression: Union[ExpressionWithControls, Profile], gene_sets: str, met
         globalenv['expression_classes'] = expression.classes.loc[~nulls.reset_index(drop=True)]
 
     mx_diff = 'T' if mx_diff else 'F'
+    procedure = 'permutations' if single_sample else 'bayes'
 
-    r(f"""
-    design = cbind(condition=expression_classes != 'normal')
-    phenoData = AnnotatedDataFrame(data=as.data.frame(as.table(design)))
-    row.names(phenoData) = colnames(expression)
-    expression_set = ExpressionSet(assayData=data.matrix(expression), phenoData=phenoData)
-
-    # transform to named list from GeneSetCollection class object
-    geneSets <- geneIds({gene_sets})
-
-    expressions <- exprs(expression_set)
-    genesInExpressionData <- rownames(expressions)
-    overlaps <- sapply(geneSets, function(genes) genes[genes %in% genesInExpressionData])
-    subset <- overlaps[sapply(overlaps, function(genes) length(genes) > 1)]
-
-    result = gsva(expressions, subset, method='{method}', verbose=F, parallel.sz=1, mx.diff={mx_diff})
-    """)
-
-    if permutations:
-        r(f"""
-        # permutations
-        genes_order = rownames(expressions)
-
-        result = as.data.frame(result)
-        result$difference = result$condition - result$control
-
-        n_permutations = {permutations}
-        permutations = c(1:n_permutations)
-        permutation_effect_sizes = lapply(permutations, function(i) {{
-          rownames(expressions) = sample(genes_order)  # a random permutation
-          random_result = gsva(expressions, subset, method='{method}', verbose=F, parallel.sz=1, mx.diff={mx_diff})
-          random_effect_size <- random_result[,'condition'] - random_result[,'control']
-          random_effect_size
-        }})
-
-        random_effect_sizes = as.data.frame(permutation_effect_sizes, col.names=permutations)
-
-        result$p_value = mapply(
-          function(effect_size, gene_set_name) {{
-            if (effect_size >= 0) {{
-                is_random_permutation_more_extreme = random_effect_sizes[gene_set_name,] > effect_size
-            }}
-            else {{
-                is_random_permutation_more_extreme = random_effect_sizes[gene_set_name,] < effect_size
-            }}
-            sum(is_random_permutation_more_extreme) / n_permutations
-          }},
-          result$difference,
-          rownames(result)
-        )
-
-        result$fdr = p.adjust(result$p_value, method = 'fdr')
-        """)
-
-    result = r("""
-    gene_sets = rownames(result)
-    columns = colnames(result)
+    result = r(f"""
+    result = gsva.with_probabilities(
+        expression, expression_classes, {gene_sets}, '{procedure}',
+        method = '{method}', mx.diff = {mx_diff}
+        {', permutations = ' + str(permutations) if procedure == 'permutations' else ''}
+    )
+    rows = rownames(result)
     result
     """)
-
-    rows = r['gene_sets']
-    if single_sample:
-        columns = r['columns']
-        result.index = rows
-        result.rename({'difference': 'nes', 'fdr': 'fdr_q-val'}, inplace=True, axis=1)
-        r('rm(random_effect_sizes)')
-    else:
-        # result of the gsva is then used to create a table
-        result = r("""
-        library(limma)
-        design = cbind(all=1, condition=expression_classes != 'normal')
-        fit <- lmFit(result, design)
-        fit <- eBayes(fit)
-        allGeneSets <- topTable(fit, coef="condition", number=Inf, adjust="BH")
-        # DeGeneSets <- topTable(fit, coef="condition", number=Inf, p.value=adjPvalueCutoff, adjust="BH")
-        gene_sets = rownames(allGeneSets)
-        allGeneSets
-        """)
-        rows = r['gene_sets']
-        result.rename({'adj.P.Val': 'fdr_q-val', 'logFC': 'nes'}, axis=1, inplace=True)
-        result.index = rows
-
-    r('rm(expression_set, design, expression, result, gene_sets, columns)')
+    result.index = r['rows']
 
     global process_specific_counter
     process_specific_counter += 1
@@ -171,6 +101,8 @@ def create_gsva_scorer(
     importr('GSVA')
     importr('Biobase')
     gsea_base = importr('GSEABase')
+    cwd = Path(__file__).parent
+    r(f'source("{cwd}/gsva.R")')
 
     gmt_path = db.resolve(gene_sets, id_type)
     globalenv[gene_sets] = gsea_base.getGmt(gmt_path)
