@@ -173,12 +173,13 @@ def create_gsva_scorer(
     gsea_base = importr('GSEABase')
 
     gmt_path = db.resolve(gene_sets, id_type)
-    globalenv[gene_sets] = gsea_base.getGmt(gmt_path)
+    gene_sets_r = gsea_base.getGmt(gmt_path)
 
     input = Profile if single_sample else ExpressionWithControls
 
     def gsva_score(disease: input, compound: input):
         multiprocess_cache_manager.respawn_cache_if_needed()
+        globalenv[gene_sets] = gene_sets_r
 
         disease_gene_sets = gsva(disease, gene_sets=gene_sets, method=method, single_sample=single_sample, permutations=permutations, mx_diff=mx_diff)
 
