@@ -60,13 +60,14 @@ def create_roast_scorer(
     importr('limma')
     importr('Biobase')
 
-    globalenv[gene_sets] = ListVector({
+    gene_sets_r = ListVector({
         gene_set.name: StrVector(list(gene_set.genes))
         for gene_set in db.load(gene_sets=gene_sets, id_type=id_type)
     })
 
     def roast_score(disease: ExpressionWithControls, compound: ExpressionWithControls):
         multiprocess_cache_manager.respawn_cache_if_needed()
+        globalenv[gene_sets] = gene_sets_r
 
         if len(compound.cases.columns) < 2 or len(compound.controls.columns) < 2:
             print(f'Skipping {compound} not enough degrees o freedom (no way to compute in-group variance)')
@@ -80,8 +81,8 @@ def create_roast_scorer(
 
             joined = combine_gsea_results(disease_gene_sets, signature_gene_sets, na_action)
             return joined.score.mean()
-        except RRuntimeError:
-            print(compound)
+        except RRuntimeError as e:
+            print(e)
             return None
 
     return scoring_function(roast_score, input=ExpressionWithControls, grouping=grouping)
