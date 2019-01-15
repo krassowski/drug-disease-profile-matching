@@ -67,7 +67,7 @@ def gsva(expression: Union[ExpressionWithControls, Profile], gene_sets: str, met
         globalenv['expression_classes'] = expression.classes.loc[~nulls.reset_index(drop=True)]
 
     mx_diff = 'T' if mx_diff else 'F'
-    procedure = 'permutations' if single_sample else 'bayes'
+    procedure = 'gene_permutation' if single_sample else 'bayes'
 
     result = r(f"""
     result = gsva.with_probabilities(
