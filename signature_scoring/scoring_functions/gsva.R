@@ -16,14 +16,13 @@ gsva.with_probabilities <- function(
   genesInExpressionData <- rownames(expressions)
   # also, see GSVA::computeGeneSetsOverlap()
   if (limit_to_gene_sets != FALSE) {
-      gene_sets <- gene_sets[vapply(names(gene_sets), function(name) name %in% limit_to_gene_sets, F)]
+      gene_sets <- gene_sets[sapply(names(gene_sets), function(name) name %in% limit_to_gene_sets)]
   }
 
   subset <- gene_sets[
-    vapply(
+    sapply(
         gene_sets,
-        function(genes) length(genes[genes %in% genesInExpressionData]) > 1,
-        F
+        function(genes) length(genes[genes %in% genesInExpressionData]) > 1
     )
   ]
 

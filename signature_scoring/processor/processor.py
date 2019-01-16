@@ -1,6 +1,7 @@
 import sys
 
 from pandas import Series
+from tqdm import tqdm
 
 from data_sources.drug_connectivity_map import Scores, dcm
 from helpers import first, WarningManager

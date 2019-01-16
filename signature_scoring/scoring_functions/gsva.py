@@ -86,7 +86,7 @@ def gsva(expression: Union[ExpressionWithControls, Profile], gene_sets_path: str
         result = gsva.with_probabilities(
             expression, expression_classes, gene_sets, '{procedure}',
             method = '{method}', mx.diff={mx_diff}, include_control=F, cores={cores},
-            limit_to_gene_sets={'c' + str(tuple(limit_to_gene_sets)) if limit_to_gene_sets else 'F'}, progress=F
+            limit_to_gene_sets={'c' + str(tuple(limit_to_gene_sets)) if limit_to_gene_sets is not False else 'F'}, progress=F
             {', permutations = ' + str(permutations) if procedure == 'permutations' else ''}
         )
         write.csv(result, '{f_result.name}')
@@ -137,6 +137,7 @@ def create_gsva_scorer(
 
         disease_gene_sets.drop(disease_gene_sets[disease_gene_sets['fdr_q-val'] > q_value_cutoff].index, inplace=True)
 
+        assert len(disease_gene_sets.index)
         signature_gene_sets = gsva(compound, gene_sets_path=gene_sets_file.name, method=method, single_sample=single_sample, permutations=permutations, mx_diff=mx_diff, _cache=False, cores=cores, limit_to_gene_sets=list(disease_gene_sets.index))
 
         joined = combine_gsea_results(disease_gene_sets, signature_gene_sets, na_action)
