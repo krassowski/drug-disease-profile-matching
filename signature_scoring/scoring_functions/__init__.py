@@ -37,6 +37,10 @@ class ScoringFunction:
     #   was used to validate correctness of the pipeline.
     grouping: str = None
 
+    custom_multiprocessing: bool = False
+
+    multiprocessing_exclude_first: bool = True
+
     @property
     def collection(self) -> Type[SignaturesGrouping]:
         """Provides constructor which (when applied to SignaturesData)
@@ -55,8 +59,8 @@ class ScoringFunction:
     def is_applicable_to_control_signatures(self):
         return self.input != ExpressionWithControls
 
-    def __call__(self, disease: input, compound: input):
-        return self.func(disease, compound)
+    def __call__(self, disease: input, compound: input, **kwargs):
+        return self.func(disease, compound, **kwargs)
 
 
 def scoring_function(func, **kwargs):

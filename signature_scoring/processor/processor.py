@@ -76,7 +76,10 @@ class SignatureProcessor:
             # TODO: apply limit to the compound_profile for the ExpressionsWithControls case.
             #  How? One idea: take the means/medians of gene values and choose n best genes.
 
-        score = scoring_func(disease_profile, compound_profile)
+        args = {}
+        if scoring_func.custom_multiprocessing:
+            args = {'cores': self.processes}
+        score = scoring_func(disease_profile, compound_profile, **args)
 
         del signature, compound_profile
 
@@ -109,6 +112,11 @@ class SignatureProcessor:
         if len(selected_genes) != 2 * limit and limit != sys.maxsize:
             self.warning_manager.warn_once(f'Selected only {len(selected_genes)} genes out of {2 * limit} allowed.')
 
+    def single_process_map_with_shared(self, func, iterable, shared_args):
+        if self.progress:
+            iterable = tqdm(iterable)
+        return [func(i, *shared_args) for i in iterable]
+
     def score_signatures(
         self, scoring_func, disease_signature, limit=500, gene_subset=None,
         scale=False, gene_selection=Series.nlargest,
@@ -137,16 +145,27 @@ class SignatureProcessor:
 
         shared_args = [disease_profile, rows_of_selected_genes, limit, scoring_func, gene_selection]
 
-        # first signature is scored in one process,
-        # so that the common cache is populated
-        # without repetition of calculations
-        scores = [self.score_signature_group(self.ids[0], *shared_args)]
+        start = 0
+        scores = []
+
+        if scoring_func.multiprocessing_exclude_first:
+            # first signature is scored in one process,
+            # so that the common cache is populated
+            # without repetition of calculations
+            scores = [self.score_signature_group(self.ids[0], *shared_args)]
+            start = 1
+
+        map_with_shared = (
+            self.single_process_map_with_shared
+            if scoring_func.custom_multiprocessing else
+            self.pool.imap
+        )
 
         # and then iteratively apply scoring function to each next compound signature
         scores.extend(
-            self.pool.imap(
+            map_with_shared(
                 self.score_signature_group,
-                self.ids[1:],
+                self.ids[start:],
                 shared_args=shared_args
             )
         )

@@ -1,9 +1,13 @@
 from pathlib import Path
 from typing import Union
 from warnings import warn
+from tempfile import NamedTemporaryFile
+from subprocess import Popen, PIPE
+from os import system
 
+from pandas import read_csv
 from pandas import DataFrame, concat, Series
-from rpy2.robjects import r, globalenv
+from rpy2.robjects import r
 from rpy2.robjects.packages import importr
 
 from methods.gsea import MolecularSignaturesDatabase
@@ -15,14 +19,14 @@ from .gsea import combine_gsea_results
 
 
 db = MolecularSignaturesDatabase()
-GSVA_CACHE = None
-multiprocess_cache_manager.add_cache(globals(), 'GSVA_CACHE', 'dict')
+GSVA_CACHE = {}
 
 
-process_specific_counter = 0
+gsva_tmp_dir = '/tmp/gsva/'
+vanilla_R = ['R', '--vanilla', '--quiet']
 
 
-def gsva(expression: Union[ExpressionWithControls, Profile], gene_sets: str, method: str = 'gsva', single_sample=False, permutations=1000, mx_diff=True, _cache=True):
+def gsva(expression: Union[ExpressionWithControls, Profile], gene_sets_path: str, method: str = 'gsva', single_sample=False, permutations=1000, mx_diff=True, cores=1, _cache=True, limit_to_gene_sets=False, verbose=False):
     """
     Excerpt from GSVA documentation:
         An important argument of the gsva() function is the flag mx.diff which is set to TRUE by default.
@@ -36,7 +40,7 @@ def gsva(expression: Union[ExpressionWithControls, Profile], gene_sets: str, met
     if not single_sample and permutations:
         raise warn('permutations are not supported when not single_sample')
 
-    key = (expression.hashable, method, gene_sets)
+    key = (expression.hashable, method, gene_sets_path)
 
     if key in GSVA_CACHE:
         return GSVA_CACHE[key]
@@ -50,8 +54,9 @@ def gsva(expression: Union[ExpressionWithControls, Profile], gene_sets: str, met
         joined['control'] = 0
         joined.index = joined.index.astype(str)
 
-        globalenv['expression'] = joined
-        globalenv['expression_classes'] = Series(['case', 'control'])
+        expression_classes = Series(['case', 'control'])
+        expression = joined
+
     else:
         joined = expression.joined
 
@@ -63,27 +68,38 @@ def gsva(expression: Union[ExpressionWithControls, Profile], gene_sets: str, met
             print(f'Following columns contain nulls and will be skipped: {list(joined.columns[nulls])}')
         joined = joined[joined.columns[~nulls]]
 
-        globalenv['expression'] = joined
-        globalenv['expression_classes'] = expression.classes.loc[~nulls.reset_index(drop=True)]
+        expression_classes = expression.classes.loc[~nulls.reset_index(drop=True)]
+        expression = joined
 
     mx_diff = 'T' if mx_diff else 'F'
     procedure = 'gene_permutation' if single_sample else 'bayes'
+    cwd = Path(__file__).parent
 
-    result = r(f"""
-    result = gsva.with_probabilities(
-        expression, expression_classes, {gene_sets}, '{procedure}',
-        method = '{method}', mx.diff = {mx_diff}
-        {', permutations = ' + str(permutations) if procedure == 'permutations' else ''}
-    )
-    rows = rownames(result)
-    result
-    """)
-    result.index = r['rows']
+    with NamedTemporaryFile(mode='w', prefix=gsva_tmp_dir) as f_expression, NamedTemporaryFile(prefix=gsva_tmp_dir) as f_result:
+        expression.to_csv(f_expression)
+        script = f"""
+        source("{cwd}/gsva.R")
+        expression = read.csv('{f_expression.name}', row.names=1)
+        expression_classes = c{tuple(expression_classes)}
+        gene_sets = readRDS('{gene_sets_path}')
 
-    global process_specific_counter
-    process_specific_counter += 1
-    if process_specific_counter % 20 == 0:
-        r('gc()')
+        result = gsva.with_probabilities(
+            expression, expression_classes, gene_sets, '{procedure}',
+            method = '{method}', mx.diff={mx_diff}, include_control=F, cores={cores},
+            limit_to_gene_sets={'c' + str(tuple(limit_to_gene_sets)) if limit_to_gene_sets else 'F'}, progress=F
+            {', permutations = ' + str(permutations) if procedure == 'permutations' else ''}
+        )
+        write.csv(result, '{f_result.name}')
+        """
+
+        process = Popen(vanilla_R, stdin=PIPE, stdout=PIPE, stderr=PIPE)
+        r = process._stdin_write(script.encode())
+        if verbose:
+            from thirdparty import parallel_output
+            parallel_output(process)
+        else:
+            process.wait()
+        result = read_csv(f_result.name, index_col=0)
 
     if _cache:
         GSVA_CACHE[key] = result
@@ -98,29 +114,33 @@ def create_gsva_scorer(
     if single_sample and method == 'plage':
         warn('PLAGE is not suitable for single sample testing')
 
-    importr('GSVA')
-    importr('Biobase')
-    gsea_base = importr('GSEABase')
-    cwd = Path(__file__).parent
-    r(f'source("{cwd}/gsva.R")')
+    if not Path(gsva_tmp_dir).exists():
+        system(f'mkdir -p {gsva_tmp_dir}')
+        system(f'sudo mount -t tmpfs -o size=2048M tmpfs {gsva_tmp_dir}')
 
     gmt_path = db.resolve(gene_sets, id_type)
+    gsea_base = importr('GSEABase')
     gene_sets_r = gsea_base.getGmt(gmt_path)
+
+    # transform to named list from GeneSetCollection class object
+    gene_sets_r = gsea_base.geneIds(gene_sets_r)
+
+    gene_sets_file = NamedTemporaryFile(delete=False, prefix=gsva_tmp_dir)
+    r['saveRDS'](gene_sets_r, file=gene_sets_file.name)
 
     input = Profile if single_sample else ExpressionWithControls
 
-    def gsva_score(disease: input, compound: input):
+    def gsva_score(disease: input, compound: input, cores=1):
         multiprocess_cache_manager.respawn_cache_if_needed()
-        globalenv[gene_sets] = gene_sets_r
 
-        disease_gene_sets = gsva(disease, gene_sets=gene_sets, method=method, single_sample=single_sample, permutations=permutations, mx_diff=mx_diff)
+        disease_gene_sets = gsva(disease, gene_sets_path=gene_sets_file.name, method=method, single_sample=single_sample, permutations=permutations, mx_diff=mx_diff, cores=cores)
 
         disease_gene_sets.drop(disease_gene_sets[disease_gene_sets['fdr_q-val'] > q_value_cutoff].index, inplace=True)
 
-        signature_gene_sets = gsva(compound, gene_sets=gene_sets, method=method, single_sample=single_sample, permutations=permutations, mx_diff=mx_diff, _cache=False)
+        signature_gene_sets = gsva(compound, gene_sets_path=gene_sets_file.name, method=method, single_sample=single_sample, permutations=permutations, mx_diff=mx_diff, _cache=False, cores=cores, limit_to_gene_sets=list(disease_gene_sets.index))
 
         joined = combine_gsea_results(disease_gene_sets, signature_gene_sets, na_action)
-
+        assert not (set(signature_gene_sets.index) - set(disease_gene_sets.index))
         return joined.score.mean()
 
     gsva_score.__name__ = (
@@ -130,4 +150,4 @@ def create_gsva_scorer(
         ('_single_sample' if single_sample else '')
     )
 
-    return scoring_function(gsva_score, input=input, grouping=grouping)
+    return scoring_function(gsva_score, input=input, grouping=grouping, custom_multiprocessing=True)
