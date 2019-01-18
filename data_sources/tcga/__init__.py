@@ -21,12 +21,6 @@ from layers_data import LayerData, LayerDataWithSubsets, Subset, MutationAnnotat
 from .barcode import TCGABarcode
 
 
-try:
-    firebrowse_r = importr('FirebrowseR')
-except RRuntimeError:
-    warn('No firebrowse_r found')
-
-
 def download_with_firebrowser(method, page_size=2000, **kwargs):
         pages = []
         finished = False
@@ -373,6 +367,10 @@ class TCGA(DataSource):
 
     def _mut_sigv_two_cv_mutations(self, **kwargs):
         """Uses FirebrowseR to fetch significant mutations as called by MutSig2CV"""
+        try:
+            firebrowse_r = importr('FirebrowseR')
+        except RRuntimeError:
+            warn('No firebrowse_r found')
         method = firebrowse_r.Analyses_Mutation_MAF
         return download_with_firebrowser(method)
     
