@@ -2,6 +2,7 @@ from functools import partial
 
 from pandas import concat, Series
 
+from helpers.temp import create_tmp_dir
 from multiprocess.cache_manager import multiprocess_cache_manager
 from methods.gsea import GSEADesktop
 from data_frames import AugmentedDataFrame
@@ -12,6 +13,8 @@ from . import scoring_function
 
 GSEA_CACHE = None
 multiprocess_cache_manager.add_cache(globals(), 'GSEA_CACHE', 'dict')
+
+tmp_dir = create_tmp_dir('gsea')
 
 
 class DummyExpressions(ExpressionProfile):
@@ -80,7 +83,7 @@ def create_gsea_scorer(gsea_app=GSEADesktop, permutations=500, gene_sets='h.all'
             dummy_profile = DummyExpressions.from_differential(differential_profile, case_name=class_name)
             results = gsea(
                 dummy_profile,
-                outdir=f'.temp_gsea/{class_name}',
+                outdir=f'{tmp_dir}/{class_name}',
                 name=f'{str(profile_hash).replace("-", "m")}'
             )
             GSEA_CACHE[key] = results

@@ -3,13 +3,13 @@ from typing import Union
 from warnings import warn
 from tempfile import NamedTemporaryFile
 from subprocess import Popen, PIPE
-from os import system
 
 from pandas import read_csv
 from pandas import DataFrame, concat, Series
 from rpy2.robjects import r
 from rpy2.robjects.packages import importr
 
+from helpers.temp import create_tmp_dir
 from methods.gsea import MolecularSignaturesDatabase
 from multiprocess.cache_manager import multiprocess_cache_manager
 
@@ -23,7 +23,7 @@ GSVA_CACHE = None
 multiprocess_cache_manager.add_cache(globals(), 'GSVA_CACHE', 'dict')
 
 
-gsva_tmp_dir = '/tmp/gsva/'
+gsva_tmp_dir = create_tmp_dir('gsva')
 vanilla_R = ['R', '--vanilla', '--quiet']
 
 
@@ -112,12 +112,10 @@ def create_gsva_scorer(
     q_value_cutoff=0.1, na_action='fill_0', method='gsva', single_sample=False,
     permutations=None, mx_diff=True, custom_multiprocessing=False
 ):
-    if single_sample and method == 'plage':
-        warn('PLAGE is not suitable for single sample testing')
 
-    if not Path(gsva_tmp_dir).exists():
-        system(f'mkdir -p {gsva_tmp_dir}')
-        system(f'sudo mount -t tmpfs -o size=2048M tmpfs {gsva_tmp_dir}')
+    # as long as dummy controls are not included (include_control=F) there is no problem, otherwise:
+    # if single_sample and method == 'plage':
+    #    warn('PLAGE is not suitable for single sample testing')
 
     gmt_path = db.resolve(gene_sets, id_type)
     gsea_base = importr('GSEABase')
