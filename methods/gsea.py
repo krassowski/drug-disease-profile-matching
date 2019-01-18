@@ -118,8 +118,10 @@ class GSEADesktop(GSEA):
         self.memory_size = memory_size
 
     def core_command(self):
-        pwd = Path().absolute().parent
-        return str(self.path) + f' -cp {pwd}/thirdparty/gsea-3.0.jar'
+        pwd = Path(__file__).absolute().parent.parent
+        gsea_path = pwd / 'thirdparty' / 'gsea-3.0.jar'
+        assert gsea_path.exists()
+        return str(self.path) + f' -cp {str(gsea_path)}'
 
     def load_results(self, outdir, name, expression_data):
         timestamps = []
