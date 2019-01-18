@@ -214,7 +214,7 @@ class ExpressionManager(LayerDataWithSubsets, ExpressionProfile):
         if nans == 'fill_0':
             query_signature = query_signature.fillna(0)
         if index_as_bytes:
-            query_signature.index = query_signature.index.str.encode('utf-8')
+            query_signature.index = query_signature.index.astype(bytes)
         return query_signature
 
 
