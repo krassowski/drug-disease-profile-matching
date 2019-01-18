@@ -1,4 +1,5 @@
 import gc
+from time import time
 
 from pandas import DataFrame
 from tqdm import tqdm_notebook
@@ -21,13 +22,15 @@ def benchmark(
 
         query = query_expression if func.input == ExpressionWithControls else query_signature
 
+        start = time()
         result = evaluate(
             func, query, indications_signatures, contraindications_signatures,
             control_signatures=control_signatures if func.is_applicable_to_control_signatures else None,
             progress=per_test_progress, reset_warnings=is_first_run,
             **kwargs
         )
-        data.append({**result, **{'Func': func.__name__}})
+        end = time()
+        data.append({**result, **{'Func': func.__name__, 'Time': end - start}})
 
         gc.collect()
         is_first_run = False
