@@ -10,7 +10,7 @@ class NeatNamespace(SimpleNamespace):
     __name__ = 'Namespace'
 
     def __init__(self, *args, **kwargs):
-        if not kwargs:
+        if not kwargs and args:
             assert args and len(args) == 1
             kwargs = args[0]
             kwargs = {str(k): v for k, v in kwargs.items()}
