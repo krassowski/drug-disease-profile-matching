@@ -19,7 +19,8 @@ from .gsea import combine_gsea_results
 
 
 db = MolecularSignaturesDatabase()
-GSVA_CACHE = {}
+GSVA_CACHE = None
+multiprocess_cache_manager.add_cache(globals(), 'GSVA_CACHE', 'dict')
 
 
 gsva_tmp_dir = '/tmp/gsva/'
@@ -109,7 +110,7 @@ def gsva(expression: Union[ExpressionWithControls, Profile], gene_sets_path: str
 def create_gsva_scorer(
     gene_sets='c2.cp.kegg', id_type='entrez', grouping='by_substance',
     q_value_cutoff=0.1, na_action='fill_0', method='gsva', single_sample=False,
-    permutations=None, mx_diff=True
+    permutations=None, mx_diff=True, custom_multiprocessing=False
 ):
     if single_sample and method == 'plage':
         warn('PLAGE is not suitable for single sample testing')
@@ -131,7 +132,8 @@ def create_gsva_scorer(
     input = Profile if single_sample else ExpressionWithControls
 
     def gsva_score(disease: input, compound: input, cores=1):
-        multiprocess_cache_manager.respawn_cache_if_needed()
+        if not custom_multiprocessing:
+            multiprocess_cache_manager.respawn_cache_if_needed()
 
         disease_gene_sets = gsva(disease, gene_sets_path=gene_sets_file.name, method=method, single_sample=single_sample, permutations=permutations, mx_diff=mx_diff, cores=cores)
 
@@ -151,4 +153,4 @@ def create_gsva_scorer(
         ('_single_sample' if single_sample else '')
     )
 
-    return scoring_function(gsva_score, input=input, grouping=grouping, custom_multiprocessing=True)
+    return scoring_function(gsva_score, input=input, grouping=grouping, custom_multiprocessing=custom_multiprocessing)
