@@ -34,3 +34,4 @@ git+https://github.com/althonos/pronto.git
 pytest
 statsmodels
 dataclasses
+nbimporter
