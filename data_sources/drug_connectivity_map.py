@@ -1,4 +1,5 @@
 from functools import lru_cache
+import warnings
 
 from pandas import read_table, DataFrame, Series, concat
 from tqdm import tqdm
@@ -7,9 +8,13 @@ from config import DATA_DIR
 from data_frames import MyDataFrame
 from data_sources.data_source import DataSource
 from h5py import File
+from h5py.h5py_warnings import H5pyDeprecationWarning
 
 from models import ExpressionProfile
 from helpers.cache import cached_property
+
+
+warnings.simplefilter("ignore", H5pyDeprecationWarning)
 
 
 class PerturbationProfile(ExpressionProfile):
