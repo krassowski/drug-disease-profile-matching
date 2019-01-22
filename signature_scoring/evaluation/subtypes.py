@@ -8,6 +8,7 @@ from time import sleep
 from typing import Dict
 
 from pandas import concat, DataFrame
+from tqdm import tqdm
 
 from multiprocess import Pool
 from .display import maximized_metrics, minimized_metrics, choose_columns
@@ -82,46 +83,62 @@ def group_permutations_by_subtype(permutations) -> Dict[str, DataFrame]:
     return grouped_by_corresponding_cluster
 
 
-def test_metrics(
+def compare_against_permutations_group(function_result, function_permutations, minimized_columns, maximized_columns, **kwargs):
+    data = []
+
+    for metrics, sign in [(minimized_columns, -1), (maximized_columns, 1)]:
+
+        for metric_name in metrics:
+            observed_value = function_result[metric_name]
+            metric_permutations = function_permutations[metric_name]
+
+            more_extreme = (
+                metric_permutations > observed_value
+                if sign == 1 else
+                metric_permutations < observed_value
+            )
+            p_value = sum(more_extreme) / len(function_permutations)
+            data.append({
+                'p_value': p_value,
+                'metric': metric_name,
+                'observed': observed_value,
+                'permutations_mean': metric_permutations.mean(),
+                'permutations': metric_permutations,
+            })
+
+    return data
+
+
+def compare_observations_with_permutations(
     subtypes_results,
-    permutations_results,
-    ranked_categories={'indications', 'contraindications', 'controls'}
+    permutations,
+    ranked_categories={'indications', 'contraindications', 'controls'},
+    check_functions=True
 ):
     data = []
 
-    permutations_grouped_by_corresponding_cluster = group_permutations_by_subtype(permutations_results)
+    permutations_grouped_by_corresponding_cluster = group_permutations_by_subtype(permutations)
 
-    for subtype, result in subtypes_results.items():
-        permutations = permutations_grouped_by_corresponding_cluster[subtype]
+    for subtype, permutations in tqdm(permutations_grouped_by_corresponding_cluster.items()):
+        result = subtypes_results[subtype]
 
         maximized_columns = choose_columns(result, maximized_metrics, ranked_categories)
         minimized_columns = choose_columns(result, minimized_metrics, ranked_categories)
 
-        for scoring_function in result.index:
+        if check_functions:
+            # do we have same scoring functions in permutations and observations?
+            assert set(result.index) == set(permutations.index)
+
+        for scoring_function in permutations.index:
             function_result = result.loc[scoring_function]
             function_permutations = permutations.loc[scoring_function]
 
-            for metrics, sign in [(minimized_columns, -1), (maximized_columns, 1)]:
-
-                for metric_name in metrics:
-                    observed_value = function_result[metric_name]
-                    metric_permutations = function_permutations[metric_name]
-
-                    more_extreme = (
-                        metric_permutations > observed_value
-                        if sign == 1 else
-                        metric_permutations < observed_value
-                    )
-                    p_value = sum(more_extreme) / len(function_permutations)
-                    data.append({
-                        'subtype': subtype,
-                        'p_value': p_value,
-                        'metric': metric_name,
-                        'observed': observed_value,
-                        'permutations_mean': metric_permutations.mean(),
-                        'permutations': metric_permutations,
-                        'scoring_function': scoring_function
-                    })
+            data.extend(
+                compare_against_permutations_group(
+                    function_result, function_permutations, minimized_columns, maximized_columns,
+                    subtype=subtype, scoring_function=scoring_function
+                )
+            )
 
     return DataFrame(data)
 
