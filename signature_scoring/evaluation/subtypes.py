@@ -83,7 +83,12 @@ def group_permutations_by_subtype(permutations) -> Dict[str, DataFrame]:
     return grouped_by_corresponding_cluster
 
 
-def compare_against_permutations_group(function_result, function_permutations, minimized_columns, maximized_columns, **kwargs):
+def compare_against_permutations_group(
+    function_result, function_permutations,
+    minimized_columns, maximized_columns,
+    include_permutations=False,
+    **kwargs
+):
     data = []
 
     for metrics, sign in [(minimized_columns, -1), (maximized_columns, 1)]:
@@ -98,13 +103,18 @@ def compare_against_permutations_group(function_result, function_permutations, m
                 metric_permutations < observed_value
             )
             p_value = sum(more_extreme) / len(function_permutations)
-            data.append({
+
+            datum = {
                 'p_value': p_value,
                 'metric': metric_name,
                 'observed': observed_value,
-                'permutations_mean': metric_permutations.mean(),
-                'permutations': metric_permutations,
-            })
+                **kwargs
+            }
+
+            if include_permutations:
+                datum['permutations'] = metric_permutations.tolist()
+
+            data.append(datum)
 
     return data
 
@@ -136,6 +146,7 @@ def compare_observations_with_permutations(
             data.extend(
                 compare_against_permutations_group(
                     function_result, function_permutations, minimized_columns, maximized_columns,
+                    include_permutations=True,
                     subtype=subtype, scoring_function=scoring_function
                 )
             )
