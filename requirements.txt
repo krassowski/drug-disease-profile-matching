@@ -35,3 +35,4 @@ pytest
 statsmodels
 dataclasses
 nbimporter
+plotnine
