@@ -51,4 +51,13 @@ class AugmentedSeries(Series):
         return self.__class__
 
 
+def explode(df: DataFrame, column: str):
+    data = []
+    for row in df.itertuples(index=False):
+        base = row._asdict()
+        for entry in base.pop(column):
+            data.append({column: entry, **base})
+    return DataFrame(data)
+
+
 MyDataFrame = AugmentedDataFrame
