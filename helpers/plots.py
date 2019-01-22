@@ -27,6 +27,10 @@ def pinecone_plot(p: ggplot, observed_column: str, maximized_rows=None, hatch='-
 
     maximized_rows = maximized_rows or []
     figure = p.draw()
+
+    # suppress the figure drawn above from showing up
+    plt.close()
+
     axes = figure.get_axes()
 
     columns_id = p.facet.cols[0]
