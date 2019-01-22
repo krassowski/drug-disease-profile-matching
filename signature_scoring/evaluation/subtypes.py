@@ -26,7 +26,7 @@ def subtypes_benchmark(expression, samples_by_subtype, benchmark_function, funcs
     return subtypes_results
 
 
-def random_subtypes_benchmark(expression, *args, **kwargs):
+def random_subtypes_benchmark(i, expression, *args, **kwargs):
     samples = list(expression.columns)
     random_mapping = dict(zip(samples, random.sample(samples, len(samples))))
     f = StringIO()
