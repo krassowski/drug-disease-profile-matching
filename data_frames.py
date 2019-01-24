@@ -51,13 +51,21 @@ class AugmentedSeries(Series):
         return self.__class__
 
 
-def explode(df: DataFrame, column: str):
+def explode(df: DataFrame, column: str, keep_order=False):
     data = []
+    columns = list(df.columns)
+    to_explode_index = columns.index(column)
+    columns.remove(column)
+    columns = [column, *columns]
     for row in df.itertuples(index=False):
-        base = row._asdict()
-        for entry in base.pop(column):
-            data.append({column: entry, **base})
-    return DataFrame(data)
+        base = [*row[:to_explode_index], *row[to_explode_index + 1:]]
+        for entry in row[to_explode_index]:
+            data.append([entry, *base])
+    del df
+    new_df = DataFrame(data, columns=columns)
+    if keep_order:
+        new_df = new_df[columns]
+    return new_df
 
 
 MyDataFrame = AugmentedDataFrame
