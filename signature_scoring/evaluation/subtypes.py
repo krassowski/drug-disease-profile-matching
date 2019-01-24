@@ -7,7 +7,7 @@ from io import StringIO
 from time import sleep
 from typing import Dict
 
-from pandas import concat, DataFrame
+from pandas import concat, DataFrame, Categorical
 from tqdm import tqdm
 
 from multiprocess import Pool
@@ -102,7 +102,7 @@ def compare_against_permutations_group(
                 if sign == 1 else
                 metric_permutations < observed_value
             )
-            p_value = sum(more_extreme) / len(function_permutations)
+            p_value = sum(more_extreme) / len(metric_permutations)
 
             datum = {
                 'p_value': p_value,
@@ -125,9 +125,10 @@ def compare_observations_with_permutations(
     ranked_categories={'indications', 'contraindications', 'controls'},
     check_functions=True
 ):
-    data = []
 
     permutations_grouped_by_corresponding_cluster = group_permutations_by_subtype(permutations)
+
+    data = []
 
     for subtype, permutations in tqdm(permutations_grouped_by_corresponding_cluster.items()):
         result = subtypes_results[subtype]
@@ -139,11 +140,11 @@ def compare_observations_with_permutations(
             # do we have same scoring functions in permutations and observations?
             assert set(result.index) == set(permutations.index)
 
-        for scoring_function in permutations.index:
+        for scoring_function in permutations.index.unique():
             function_result = result.loc[scoring_function]
             function_permutations = permutations.loc[scoring_function]
 
-            data.extend(
+            rows = (
                 compare_against_permutations_group(
                     function_result, function_permutations, minimized_columns, maximized_columns,
                     include_permutations=True,
@@ -151,5 +152,17 @@ def compare_observations_with_permutations(
                 )
             )
 
-    return DataFrame(data)
+            data.extend(rows)
+
+    df = DataFrame(data)
+
+    # lets save some memory
+    categorical_variables = ['subtype', 'scoring_function', 'metric']
+
+    # TODO: would be great to work on https://github.com/pandas-dev/pandas/issues/4464
+    #  on some rainy weekend - this could have a huge speed & memory benefit
+    for categorical_name in categorical_variables:
+        df[categorical_name] = Categorical(df[categorical_name])
+
+    return df
 
