@@ -73,7 +73,7 @@ def create_gsea_scorer(gsea_app=GSEADesktop, permutations=500, gene_sets='h.all'
     def cached_gsea_run(gsea, gene_sets, q_value_cutoff, differential_profile, class_name, warn=False):
 
         profile_hash = hash(differential_profile)
-        key = (gene_sets, q_value_cutoff, profile_hash)
+        key = (gene_sets, q_value_cutoff, profile_hash, class_name)
 
         if key in GSEA_CACHE:
             results = GSEA_CACHE[key]
@@ -110,7 +110,7 @@ def create_gsea_scorer(gsea_app=GSEADesktop, permutations=500, gene_sets='h.all'
         )
 
         disease_gene_sets_up, disease_gene_sets_dn = cached_gsea_run(
-            gsea, gene_sets, q_value_cutoff, disease_differential, class_name='disease', warn=True
+            gsea, gene_sets, q_value_cutoff, disease_differential, class_name='disease', warn=True, delete=False
         )
 
         signature = AugmentedDataFrame(

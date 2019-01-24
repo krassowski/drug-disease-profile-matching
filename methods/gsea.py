@@ -4,12 +4,16 @@ from copy import copy
 
 from pandas import read_csv, read_table
 from tempfile import TemporaryDirectory, NamedTemporaryFile
-from os import makedirs
+from os import makedirs, remove
 from pathlib import Path
 from warnings import warn
 
 from config import DATA_DIR
+from helpers.temp import create_tmp_dir
 from models import ExpressionProfile
+
+
+tmp_dir = create_tmp_dir('gsea/input')
 
 
 class GSEA:
@@ -18,7 +22,7 @@ class GSEA:
         self.msigdb = MolecularSignaturesDatabase()
 
     def prepare_files(self, expression_data: ExpressionProfile):
-        with NamedTemporaryFile('w', delete=False, suffix='.cls') as f:
+        with NamedTemporaryFile('w', delete=False, dir=tmp_dir, suffix='.cls') as f:
             classes = expression_data.classes
             f.write(f'{len(classes)} {len(set(classes))} 1\n')
             classes_set = []
@@ -29,7 +33,7 @@ class GSEA:
             f.write(' '.join(classes))
             classes = f.name
 
-        with NamedTemporaryFile('w', delete=False, suffix='.txt') as f:
+        with NamedTemporaryFile('w', delete=False, dir=tmp_dir, suffix='.txt') as f:
             expression_data = copy(expression_data)
             columns = expression_data.columns
             expression_data['DESCRIPTION'] = 'na'
@@ -149,7 +153,7 @@ class GSEADesktop(GSEA):
         self, expression_data, gene_sets, id_type='symbols', collapse=True, mode='Max_probe',
         permutations=1000, detailed_sets_analysis=False, permutation_type='phenotype', outdir=None,
         plot_top_x=0, name='my_analysis', metric='Signal2Noise', verbose=False, use_existing=False,
-        normalization='meandiv',
+        normalization='meandiv', delete=True,
         **kwargs
     ):
         """
@@ -190,7 +194,7 @@ class GSEADesktop(GSEA):
 
         data_path, classes_path = self.prepare_files(expression_data)
 
-        with TemporaryDirectory() as temp_dir:
+        with TemporaryDirectory(dir=tmp_dir) as temp_dir:
             if not outdir:
                 outdir = Path(temp_dir)
             else:
@@ -227,7 +231,11 @@ class GSEADesktop(GSEA):
 
             results = self.load_results(outdir, name, expression_data)
 
-            return results
+        if delete:
+            remove(data_path)
+            remove(classes_path)
+
+        return results
 
 
 class GSEApy(GSEA):
