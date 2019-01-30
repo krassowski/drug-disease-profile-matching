@@ -36,3 +36,4 @@ statsmodels
 dataclasses
 nbimporter
 plotnine
+tqdm
