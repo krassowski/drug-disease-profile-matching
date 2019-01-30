@@ -1,3 +1,5 @@
+from copy import copy
+
 from pandas import DataFrame, MultiIndex
 
 from utilities_namespace import show_table
@@ -53,7 +55,7 @@ def summarize(
     sort='ranks',
     return_table=False
 ):
-    ranked_table = rank_and_sort(df, ranked_categories)
+    ranked_table = rank_and_sort(copy(df), ranked_categories)
 
     tuples = [
         column.split(':') if ':' in column else ('meta', column)
