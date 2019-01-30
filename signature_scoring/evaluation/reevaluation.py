@@ -84,12 +84,13 @@ def reevaluate_benchmark(old_benchmark: DataFrame, reevaluate_kwargs, verbose=Tr
         if added_metrics:
             print(added_metrics, 'metrics added')
 
+        old_benchmark_reordered = old_benchmark.loc[reevaluated_benchmark.index]
         for column in (old_columns & new_columns):
-            if not old_benchmark[column].equals(reevaluated_benchmark[column]):
+            if not old_benchmark_reordered[column].equals(reevaluated_benchmark[column]):
                 if (
-                    is_numeric_dtype(old_benchmark[column].dtype)
+                    is_numeric_dtype(old_benchmark_reordered[column].dtype)
                     and
-                    isclose(old_benchmark[column], reevaluated_benchmark[column]).all()
+                    isclose(old_benchmark_reordered[column], reevaluated_benchmark[column]).all()
                 ):
                     print(column, 'has changed slightly (float isclose)')
                 else:
