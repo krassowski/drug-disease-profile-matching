@@ -105,7 +105,7 @@ class Pool:
             processes=processes, with_progress_bar=progress_bar
         )
 
-    def imap(self, func, iterable, shared_args=tuple()):
+    def imap(self, func, iterable, shared_args=tuple(), total=None):
         """Iteratively apply function to items ofo `iterable` and return results.
 
         The order of resultant list is not guaranteed to be preserved.
@@ -115,6 +115,7 @@ class Pool:
             func: function to be applied to items
             iterable: an iterable with items
             shared_args: positional arguments to be passed to func after item
+            total: must be provided if iterable has no __len__
         """
 
         if self.processes == 1:
@@ -122,7 +123,7 @@ class Pool:
             # (and there is less overhead than forking for one more)
             return map(lambda i: func(i, *shared_args), tqdm(iterable))
 
-        with self.multiprocessing_queue(func, shared_args, total=len(iterable)) as api:
+        with self.multiprocessing_queue(func, shared_args, total=total or len(iterable)) as api:
             for item in iterable:
                 api.queue.put(item)
 
