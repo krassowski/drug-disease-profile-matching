@@ -96,10 +96,11 @@ def evaluation_summary(
 
             # contaminate dataframes by in-place assignment to reduce copy operations
             for group, value in groups_label_value_map.items():
+                # this is a dict selection, no need to check that copy gets returned
+                # (plus I assume that it will change the data - with little impact)
                 df = subtype_map[value]
-                assert is_copy(df, subtype_map)
                 df['group'] = group
-                df['expected_value'] = value
+                df['expected_score'] = value
 
             aggregated_subtype_scores = concat(subtype_map.values())
             subtype_vector = scores_vector(aggregated_subtype_scores)

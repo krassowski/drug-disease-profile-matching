@@ -105,10 +105,8 @@ def reevaluate_with_subtypes(permutations: List[DataFrame], processes=None, **kw
         )
     )
 
-    for permutation, subtype in reevaluated_permutations:
-        permutation['subtype'] = subtype
-
     return concat(
-        permutation
+        permutation.assign(subtype=subtype)
         for permutation, subtype in reevaluated_permutations
+        if not permutation.empty
     )

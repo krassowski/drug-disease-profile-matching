@@ -9,6 +9,7 @@ from pandas import concat, DataFrame, Categorical, Series
 from tqdm import tqdm
 
 from .display import maximized_metrics, minimized_metrics, choose_columns
+from .scores_models import Group
 
 
 def subtypes_benchmark(expression, samples_by_subtype, benchmark_function, funcs, *args, samples_mapping=lambda x: x, **kwargs):
@@ -51,7 +52,6 @@ def compare_against_permutations_group(
     function_result: Series, function_permutations: DataFrame,
     minimized_columns, maximized_columns,
     include_permutations=False
-
 ):
     data = []
 
@@ -90,20 +90,52 @@ def compare_against_permutations_group(
     return DataFrame(data)
 
 
+def test_permutations_number_in_subtype(
+    result_subtype_subset: DataFrame, subtype_subset: DataFrame, subtype: str,
+    ranked_categories={'indications', 'contraindications', 'controls'}
+):
+    data = []
+
+    maximized_columns = choose_columns(result_subtype_subset, maximized_metrics, ranked_categories)
+    minimized_columns = choose_columns(result_subtype_subset, minimized_metrics, ranked_categories)
+
+    if set(subtype_subset.index.unique()) != set(result_subtype_subset.index.unique()):
+        warn('Different sets of functions in result and permutations')
+
+    for scoring_function in subtype_subset.index.unique():
+
+        function_subset = subtype_subset.loc[scoring_function]
+        result_function_subset = result_subtype_subset.loc[scoring_function]
+        count = len(function_subset)
+
+        for first_n_permutations in range(2, count + 1):
+            considered_permutations = function_subset.head(first_n_permutations)
+
+            measurements = DataFrame(compare_against_permutations_group(
+                result_function_subset, considered_permutations,
+                minimized_columns, maximized_columns
+            ))
+            measurements['n_permutations'] = first_n_permutations
+            measurements['scoring_function'] = scoring_function
+            data.append(measurements)
+
+    joined = concat(data)
+    joined['subtype'] = subtype
+    return joined
+
+
 def compare_observations_with_permutations(
-    subtypes_results,
-    permutations,
+    subtypes_results: Dict[Group, DataFrame],
+    permutations: DataFrame,
     ranked_categories={'indications', 'contraindications', 'controls'},
-    check_functions=True,
-    reevaluate_permutations=False,
-    reevaluation_kwargs=None
+    check_functions=True
 ):
 
-    permutations_grouped_by_corresponding_cluster = group_permutations_by_subtype(permutations)
+    permutations_grouped_by_corresponding_cluster = permutations.groupby('subtype')
 
     data = []
 
-    for subtype, permutations in tqdm(permutations_grouped_by_corresponding_cluster.items()):
+    for subtype, permutations in tqdm(permutations_grouped_by_corresponding_cluster):
         result = subtypes_results[subtype]
 
         maximized_columns = choose_columns(result, maximized_metrics, ranked_categories)
@@ -120,8 +152,7 @@ def compare_observations_with_permutations(
             rows = (
                 compare_against_permutations_group(
                     function_result, function_permutations, minimized_columns, maximized_columns,
-                    include_permutations=True, reevaluate_permutations=reevaluate_permutations,
-                    reevaluation_kwargs=reevaluation_kwargs
+                    include_permutations=True
                 )
             )
 
