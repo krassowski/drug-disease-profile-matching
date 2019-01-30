@@ -82,4 +82,9 @@ def the_only_one(l):
     return l.iloc[0]
 
 
+def is_copy(df1, df2):
+    """Verify that the DataFrame one is not a view of DataFrame two"""
+    return df1.values.base is not df2.values.base
+
+
 MyDataFrame = AugmentedDataFrame

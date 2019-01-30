@@ -1,11 +1,8 @@
-from typing import Dict, List
-
+from typing import List
 from dataclasses import dataclass
 
-from IPython.core.display import display
-from pandas import Series, concat, DataFrame
+from pandas import Series, DataFrame
 
-from data_sources.drug_connectivity_map import AggregatedScores
 
 Group = str  # in indications, controls, contraindications
 

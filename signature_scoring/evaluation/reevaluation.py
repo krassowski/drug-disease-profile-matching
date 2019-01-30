@@ -1,7 +1,7 @@
 from functools import partial
 from warnings import warn
 
-from numpy import isclose, NaN
+from numpy import isclose
 from pandas import DataFrame
 from pandas.core.dtypes.common import is_numeric_dtype
 

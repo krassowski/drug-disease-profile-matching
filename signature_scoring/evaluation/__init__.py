@@ -7,10 +7,9 @@ from functools import partial
 from pandas import DataFrame, concat, Series
 from operator import attrgetter
 
+from data_frames import is_copy
 from data_sources.drug_connectivity_map import Scores, dcm, AggregatedScores
-from helpers.gui import display_table
 from helpers.gui.namespace import NeatNamespace
-from helpers.cache import cache_decorator
 from helpers import WarningManager
 
 from .. import score_signatures
@@ -64,11 +63,6 @@ def select_top_substance(vector: ScoresVector, how) -> Series:
     else:
         assert False
     return top_scoring
-
-
-def is_copy(df1, df2):
-    """Verify that the dataframe one is not a view of dataframe two"""
-    return df1.values.base is not df2.values.base
 
 
 def evaluation_summary(
