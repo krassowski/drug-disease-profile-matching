@@ -1,6 +1,7 @@
 import re
 from glob import glob
 from copy import copy
+from shutil import rmtree
 
 from pandas import read_csv, read_table
 from tempfile import TemporaryDirectory, NamedTemporaryFile
@@ -9,11 +10,12 @@ from pathlib import Path
 from warnings import warn
 
 from config import DATA_DIR
-from helpers.temp import create_tmp_dir
+from helpers.temp import create_tmp_dir, mount_root_in_ramdisk
 from models import ExpressionProfile
 
 
 tmp_dir = create_tmp_dir('gsea/input')
+gsea_home = mount_root_in_ramdisk('~/gsea_home')
 
 
 class GSEA:
@@ -127,7 +129,7 @@ class GSEADesktop(GSEA):
         assert gsea_path.exists()
         return str(self.path) + f' -cp {str(gsea_path)}'
 
-    def load_results(self, outdir, name, expression_data):
+    def load_results(self, outdir, name, expression_data, delete=True):
         timestamps = []
         for path in glob(f'{outdir}/{name}.Gsea.*'):
             match = re.match(f'{name}\.Gsea\.(\d*)', Path(path).name)
@@ -146,6 +148,9 @@ class GSEADesktop(GSEA):
             result.drop('gs<br>_follow_link_to_msigdb', axis='columns', inplace=True)
             result.set_index('name', inplace=True)
             results[class_type] = result
+
+        if delete:
+            rmtree(f'{outdir}/{name}.Gsea.{newest}', ignore_errors=True)
 
         return results
 
@@ -229,7 +234,7 @@ class GSEADesktop(GSEA):
             process = Popen(arguments, stdout=PIPE, stderr=PIPE)
             self.forward_streams(process.stdout, process.stderr)
 
-            results = self.load_results(outdir, name, expression_data)
+            results = self.load_results(outdir, name, expression_data, delete=delete)
 
         if delete:
             remove(data_path)
