@@ -1,16 +1,13 @@
-import pickle
 import random
 from collections import defaultdict
 from contextlib import redirect_stdout, redirect_stderr
-from copy import copy
 from io import StringIO
-from time import sleep
 from typing import Dict
+from warnings import warn
 
-from pandas import concat, DataFrame, Categorical
+from pandas import concat, DataFrame, Categorical, Series
 from tqdm import tqdm
 
-from multiprocess import Pool
 from .display import maximized_metrics, minimized_metrics, choose_columns
 
 
@@ -35,39 +32,6 @@ def random_subtypes_benchmark(i, expression, *args, **kwargs):
     return result
 
 
-def generate_permutations(
-    expression, samples_by_type, benchmark_partial, funcs,
-    *signatures, n=100, pickle_name=None, processes=None
-):
-    print('To abort permutations generation start, send keyboard interrupt now - waiting 5s')
-    sleep(5)
-
-    pool = Pool(processes)
-    single_process_benchmark = copy(benchmark_partial)
-    single_process_benchmark.keywords['processes'] = 1
-    single_process_benchmark.keywords['progress'] = False
-
-    args = [
-        expression,
-        samples_by_type, single_process_benchmark,
-        funcs,
-        *signatures
-    ]
-    permutations = list(pool.imap(random_subtypes_benchmark, range(n), args))
-
-    if pickle_name:
-        with open(f'{pickle_name}.pickle', 'wb') as f:
-            pickle.dump(permutations, f)
-
-    return permutations
-
-
-def load_permutations(name):
-    with open(f'{name}.pickle', 'rb') as f:
-        permutations = pickle.load(f)
-        return permutations
-
-
 def group_permutations_by_subtype(permutations) -> Dict[str, DataFrame]:
     grouped_by_corresponding_cluster = defaultdict(list)
 
@@ -84,10 +48,10 @@ def group_permutations_by_subtype(permutations) -> Dict[str, DataFrame]:
 
 
 def compare_against_permutations_group(
-    function_result, function_permutations,
+    function_result: Series, function_permutations: DataFrame,
     minimized_columns, maximized_columns,
-    include_permutations=False,
-    **kwargs
+    include_permutations=False
+
 ):
     data = []
 
@@ -95,6 +59,14 @@ def compare_against_permutations_group(
 
         for metric_name in metrics:
             observed_value = function_result[metric_name]
+
+            if metric_name not in function_permutations.columns:
+                warn(
+                    f'Skipping {metric_name} (not present in permutations data). '
+                    f'Please reevaluate permutations to include this metric'
+                )
+                continue
+
             metric_permutations = function_permutations[metric_name]
 
             more_extreme = (
@@ -108,7 +80,6 @@ def compare_against_permutations_group(
                 'p_value': p_value,
                 'metric': metric_name,
                 'observed': observed_value,
-                **kwargs
             }
 
             if include_permutations:
@@ -116,14 +87,16 @@ def compare_against_permutations_group(
 
             data.append(datum)
 
-    return data
+    return DataFrame(data)
 
 
 def compare_observations_with_permutations(
     subtypes_results,
     permutations,
     ranked_categories={'indications', 'contraindications', 'controls'},
-    check_functions=True
+    check_functions=True,
+    reevaluate_permutations=False,
+    reevaluation_kwargs=None
 ):
 
     permutations_grouped_by_corresponding_cluster = group_permutations_by_subtype(permutations)
@@ -140,21 +113,24 @@ def compare_observations_with_permutations(
             # do we have same scoring functions in permutations and observations?
             assert set(result.index) == set(permutations.index)
 
-        for scoring_function in permutations.index.unique():
+        for scoring_function in tqdm(permutations.index.unique()):
             function_result = result.loc[scoring_function]
             function_permutations = permutations.loc[scoring_function]
 
             rows = (
                 compare_against_permutations_group(
                     function_result, function_permutations, minimized_columns, maximized_columns,
-                    include_permutations=True,
-                    subtype=subtype, scoring_function=scoring_function
+                    include_permutations=True, reevaluate_permutations=reevaluate_permutations,
+                    reevaluation_kwargs=reevaluation_kwargs
                 )
             )
 
-            data.extend(rows)
+            rows['subtype'] = subtype
+            rows['scoring_function'] = scoring_function
 
-    df = DataFrame(data)
+            data.append(rows)
+
+    df = concat(data)
 
     # lets save some memory
     categorical_variables = ['subtype', 'scoring_function', 'metric']

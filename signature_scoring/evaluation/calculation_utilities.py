@@ -1,6 +1,6 @@
 import numpy
 
-from pandas import Series, concat
+from pandas import Series
 from scipy.stats import combine_pvalues
 from sklearn.metrics import roc_auc_score
 
@@ -34,6 +34,7 @@ def fisher_method(pvalues):
 
 @on_division_by_zero(fill_with=numpy.inf)
 def normalized_means_difference(a: Series, b: Series):
-    scores = concat([a, b])
-    scores_range = abs(scores.min() - scores.max())
+    _min = min([a.min(), b.min()])
+    _max = min([a.max(), b.max()])
+    scores_range = abs(_min - _max)
     return (a.mean() - b.mean()) / scores_range

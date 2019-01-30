@@ -1,71 +1,173 @@
 from types import FunctionType
-from typing import Dict
+from typing import Dict, Union
 
 import numpy
 from functools import partial
 
-from pandas import DataFrame
+from pandas import DataFrame, concat, Series
 from operator import attrgetter
 
-from data_sources.drug_connectivity_map import Scores, dcm
+from data_sources.drug_connectivity_map import Scores, dcm, AggregatedScores
+from helpers.gui import display_table
 from helpers.gui.namespace import NeatNamespace
 from helpers.cache import cache_decorator
 from helpers import WarningManager
 
 from .. import score_signatures
 from ..models import SignaturesGrouping
-from .scores_models import ScoresVector, ProcessedScores, TopScores
+from .scores_models import ScoresVector, ProcessedScores, TopScores, Group
 from .metrics import EvaluationMetric, metrics_manager
 
 test_warnings = WarningManager()
 
 
-def evaluation_summary(scores_dict, top, aggregate, ScoresVector=ScoresVector, transform_scores=None):
-    if aggregate:
-        aggregate = attrgetter(aggregate)
-        scores_dict = {label: aggregate(scores) for label, scores in scores_dict.items()}
+groups_label_value_map = {
+    'indications': 1,
+    'controls': 0,
+    'contraindications': -1
+}
 
-    if transform_scores:
-        scores_dict = transform_scores(scores_dict)
 
-    scores_indications, scores_controls, scores_contraindications = (
-        scores_dict['indications'], scores_dict['controls'], scores_dict['contraindications']
+def transform_to_aggregated_scores_map(
+    scores_by_group: Dict[Group, Scores], aggregate: str,
+    transform_scores=None
+) -> Dict[int, AggregatedScores]:
+
+    def verify_aggregated(scores):
+        assert isinstance(scores, AggregatedScores)
+        return scores
+
+    aggregate = (
+        attrgetter(aggregate)
+        if aggregate else
+        verify_aggregated
     )
 
-    scores_map = {
-        1: scores_indications,
-        0: scores_controls,
-        -1: scores_contraindications
+    scores_by_group = {label: aggregate(scores) for label, scores in scores_by_group.items()}
+
+    if transform_scores:
+        scores_by_group = transform_scores(scores_by_group)
+
+    return {
+        groups_label_value_map[group]: scores
+        for group, scores in scores_by_group.items()
     }
 
-    vector = ScoresVector(scores_map)
 
-    if top == 'rescaled':
+def select_top_substance(vector: ScoresVector, how) -> Series:
+    if how == 'rescaled':
         test_warnings.warn_once('Using 0.5 threshold of scaled scores vector to select top results.')
         top_scoring = vector.observed[vector.observed > 0.5]
-    else:
-        test_warnings.warn_once('Using top 0.1 quantile to select top results.')
+    elif how == 'quantile':
+        test_warnings.warn_once('Using top > 0.1 quantile to select top results.')
         top_scoring = vector.observed[vector.observed > vector.observed.quantile(0.9)]
+    else:
+        assert False
+    return top_scoring
+
+
+def is_copy(df1, df2):
+    """Verify that the dataframe one is not a view of dataframe two"""
+    return df1.values.base is not df2.values.base
+
+
+def evaluation_summary(
+    scores_dict: Dict[Group, Union[Scores, AggregatedScores]], top: str, aggregate: str, scores_vector=ScoresVector,
+    transform_scores=None, subtypes_top=None, subtypes_dicts=None
+):
+    # TODO: rename top -> top_selection_criteria
+
+    aggregated_scores_by_group_value = transform_to_aggregated_scores_map(scores_dict, aggregate, transform_scores)
+
+    aggregated_scores_by_group_label = {
+        group: aggregated_scores_by_group_value[groups_label_value_map[group]]
+        for group in scores_dict.keys()
+    }
+
+    aggregated_scores_df = concat(
+        aggregated_scores_by_group_value[value].assign(group=group, expected_score=value)
+        for group, value in groups_label_value_map.items()
+    )
+
+    vector = scores_vector(aggregated_scores_df)
+
+    if subtypes_top:
+
+        assert subtypes_top == 'best_from_each_subtype'
+
+        top_scoring_in_subtypes = []
+
+        for subtype, subtype_scores_dict in subtypes_dicts.items():
+            subtype_map = transform_to_aggregated_scores_map(subtype_scores_dict, aggregate, transform_scores)
+
+            # contaminate dataframes by in-place assignment to reduce copy operations
+            for group, value in groups_label_value_map.items():
+                df = subtype_map[value]
+                assert is_copy(df, subtype_map)
+                df['group'] = group
+                df['expected_value'] = value
+
+            aggregated_subtype_scores = concat(subtype_map.values())
+            subtype_vector = scores_vector(aggregated_subtype_scores)
+            top_scoring_in_subtypes.append(
+                select_top_substance(subtype_vector, how=top)
+            )
+
+        top_scoring = concat(top_scoring_in_subtypes)
+        top_scoring = top_scoring.groupby(top_scoring.index.names).max()
+
+    else:
+        top_scoring = select_top_substance(vector, how=top)
+
+    scores_indications, scores_controls, scores_contraindications = (
+        aggregated_scores_by_group_value[1],
+        aggregated_scores_by_group_value[0],
+        aggregated_scores_by_group_value[-1]
+    )
+
+    top = TopScores(
+        all=top_scoring,
+        indications=top_scoring[scores_indications.index.intersection(top_scoring.index)],
+        contraindications=top_scoring[scores_contraindications.index.intersection(top_scoring.index)],
+        controls=top_scoring[scores_controls.index.intersection(top_scoring.index)]
+    )
+
+    top_set = set(top_scoring.index.to_series())
+
+    def one_if_in_top(substance):
+        return 1 if substance in top_set else 0
+
+    aggregated_with_score_by_top = aggregated_scores_df.assign(
+        score=Series([one_if_in_top(substance) for substance in aggregated_scores_df.index]).values
+    )
+
+    def rescore(expected, df=aggregated_with_score_by_top):
+        df_subset = df[df.group.isin(expected)]
+        assert is_copy(df_subset, df)
+        df_subset['expected_score'] = df_subset.group.map(expected.get)
+        return df_subset
+
+    indications_over_controls = rescore(expected={'indications': 1, 'controls': 0})
+    indications_over_contraindications = rescore(expected={'indications': 1, 'contraindications': 0})
+    indications_over_controls_and_contra = rescore(expected={'indications': 1, 'contraindications': 0, 'controls': 0})
 
     scores = ProcessedScores(
         vector_overall=vector,
-        vector_contraindications=ScoresVector(scores_map, limit_to=[1, -1]),
-        vector_controls=ScoresVector(scores_map, limit_to=[1, 0]),
-        top=TopScores(
-            all=top_scoring,
-            indications=top_scoring[scores_indications.index.intersection(top_scoring.index)],
-            contraindications=top_scoring[scores_contraindications.index.intersection(top_scoring.index)],
-            controls=top_scoring[scores_controls.index.intersection(top_scoring.index)]
-        ),
+        vector_contraindications=scores_vector(aggregated_scores_df, limit_to=['indications', 'contraindications'], rescale=False),
+        vector_controls=scores_vector(aggregated_scores_df, limit_to=['indications', 'controls'], rescale=False),
+        vector_overall_binary=scores_vector(indications_over_controls_and_contra, rescale=False),
+        vector_contraindications_binary=scores_vector(indications_over_contraindications, rescale=False),
+        vector_controls_binary=scores_vector(indications_over_controls, rescale=False),
+        top=top,
         **{
-            category: aggregated_scores.score
-            for category, aggregated_scores in scores_dict.items()
+            group: aggregated_scores.score
+            for group, aggregated_scores in aggregated_scores_by_group_label.items()
         }
     )
 
     results = {
         'meta:Selected substances': len(top_scoring),
-        'meta:Scores': NeatNamespace(scores_dict),
+        'meta:Scores': NeatNamespace(aggregated_scores_by_group_label),
     }
 
     for category, metrics in metrics_manager.registry.items():
@@ -145,10 +247,11 @@ def combine_values(column):
             return numpy.nan
 
 
-def summarize_across_cell_lines(summarize_test: FunctionType, scores_dict_by_cell: dict):
+def summarize_across_cell_lines(summarize_test: FunctionType, scores_dict_by_cell: dict, subtypes_top=None, subtypes_scores=None):
     data = []
     for cell_id, cell_scores_dict in scores_dict_by_cell.items():
-        summary = summarize_test(cell_scores_dict)
+        subtype_score = None if not subtypes_scores else subtypes_scores[cell_id]
+        summary = summarize_test(cell_scores_dict, subtypes_top=subtypes_top, subtypes_dicts=subtype_score)
         summary['meta:cell_id'] = cell_id
         data.append(summary)
     data = DataFrame(data)
@@ -185,7 +288,7 @@ def evaluate(
 
     collection = scoring_func.collection
 
-    # remove signatures which were not given
+    # remove signatures that were not given
     signatures_map: Dict[str, SignaturesGrouping] = {
         label: collection(signatures)
         for label, signatures in signatures_map.items()

@@ -68,4 +68,18 @@ def explode(df: DataFrame, column: str, keep_order=False):
     return new_df
 
 
+def to_nested_dicts(df, key_columns, extract=lambda x: x, dict_type=dict):
+    if not key_columns:
+        return extract(df)
+    return dict_type({
+        value: to_nested_dicts(subset, key_columns[1:], extract=extract, dict_type=dict_type)
+        for value, subset in df.groupby(key_columns[0])
+    })
+
+
+def the_only_one(l):
+    assert len(l) == 1
+    return l.iloc[0]
+
+
 MyDataFrame = AugmentedDataFrame

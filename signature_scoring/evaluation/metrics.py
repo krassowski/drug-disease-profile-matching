@@ -216,6 +216,21 @@ def roc(scores: ProcessedScores):
     return calc.generalized_roc_auc_score(scores.vector_contraindications)
 
 
+@controls_metric(name='AUC ROC classification')
+def roc_binary(scores: ProcessedScores):
+    return calc.generalized_roc_auc_score(scores.vector_controls_binary)
+
+
+@contraindications_metric(name='AUC ROC classification')
+def roc_binary(scores: ProcessedScores):
+    return calc.generalized_roc_auc_score(scores.vector_contraindications_binary)
+
+
+@evaluation_metric(name='AUC ROC classification')
+def roc_binary(scores: ProcessedScores):
+    return calc.generalized_roc_auc_score(scores.vector_overall_binary)
+
+
 # Ratio prioritized
 
 @contraindications_metric()

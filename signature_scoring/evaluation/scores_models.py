@@ -1,9 +1,13 @@
-from typing import Dict
+from typing import Dict, List
 
 from dataclasses import dataclass
-from pandas import Series, concat
+
+from IPython.core.display import display
+from pandas import Series, concat, DataFrame
 
 from data_sources.drug_connectivity_map import AggregatedScores
+
+Group = str  # in indications, controls, contraindications
 
 
 @dataclass
@@ -23,26 +27,23 @@ class ScoresVector:
     expected: list
     observed: Series
 
-    def __init__(self, scores_map: Dict[int, AggregatedScores], limit_to=None):
+    def __init__(self, scores: DataFrame, limit_to: List[Group] = None, rescale=True):
         if limit_to:
-            scores_map = {k: v for k, v in scores_map.items() if k in limit_to}
+            scores = scores[scores.group.isin(limit_to)]
 
-        perfect_result = []
-
-        for weight, scores in scores_map.items():
-            perfect_result += [weight] * len(scores)
-
-        scores = [df.score for df in scores_map.values() if not df.empty]
-
-        if not scores:
+        if scores.empty:
             print('Something went wrong, it might have been aggregation step')
             assert False
 
-        all_results = concat(scores)
-        result_scaled = (all_results - all_results.min()) / (all_results.max() - all_results.min())
+        perfect_result = scores.expected_score
+        observed = scores.score
+
+        if rescale:
+            observed_scaled = (observed - observed.min()) / (observed.max() - observed.min())
+            observed = -1 + 2 * observed_scaled
 
         self.expected = perfect_result
-        self.observed = -1 + 2 * result_scaled
+        self.observed = observed
 
 
 @dataclass
@@ -52,6 +53,10 @@ class ProcessedScores:
     vector_overall: ScoresVector
     vector_controls: ScoresVector
     vector_contraindications: ScoresVector
+
+    vector_overall_binary: ScoresVector
+    vector_controls_binary: ScoresVector
+    vector_contraindications_binary: ScoresVector
 
     indications: Series
     contraindications: Series
