@@ -70,7 +70,7 @@ def create_gsea_scorer(gsea_app=GSEADesktop, permutations=500, gene_sets='h.all'
     """
     run_gsea_app = gsea_app().run
 
-    def cached_gsea_run(gsea, gene_sets, q_value_cutoff, differential_profile, class_name, warn=False):
+    def cached_gsea_run(gsea, gene_sets, q_value_cutoff, differential_profile, class_name, warn=False, delete=True):
 
         profile_hash = hash(differential_profile)
         key = (gene_sets, q_value_cutoff, profile_hash, class_name)
@@ -84,7 +84,8 @@ def create_gsea_scorer(gsea_app=GSEADesktop, permutations=500, gene_sets='h.all'
             results = gsea(
                 dummy_profile,
                 outdir=f'{tmp_dir}/{class_name}',
-                name=f'{str(profile_hash).replace("-", "m")}'
+                name=f'{str(profile_hash).replace("-", "m")}',
+                delete=delete
             )
             GSEA_CACHE[key] = results
 
@@ -110,7 +111,9 @@ def create_gsea_scorer(gsea_app=GSEADesktop, permutations=500, gene_sets='h.all'
         )
 
         disease_gene_sets_up, disease_gene_sets_dn = cached_gsea_run(
-            gsea, gene_sets, q_value_cutoff, disease_differential, class_name='disease', warn=True, delete=False
+            gsea, gene_sets, q_value_cutoff, disease_differential, class_name='disease', warn=True
+            # delete=False might be beneficial for single runs (if these were to be restarted after the cache is gone)
+            # but would also fill the disk with permutations quickly
         )
 
         signature = AugmentedDataFrame(
