@@ -5,10 +5,13 @@ from types import FunctionType
 from typing import List
 from warnings import warn
 
-from pandas import DataFrame, concat
+from pandas import DataFrame, concat, Series
+from tqdm.auto import tqdm
+
 
 from multiprocess import Pool
 
+from .display import choose_columns, maximized_metrics, minimized_metrics
 from .reevaluation import reevaluate_benchmark
 
 
@@ -110,3 +113,79 @@ def reevaluate_with_subtypes(permutations: List[DataFrame], processes=None, **kw
         for permutation, subtype in reevaluated_permutations
         if not permutation.empty
     )
+
+
+def compare_against_permutations_group(
+    function_result: Series, function_permutations: DataFrame,
+    minimized_columns, maximized_columns,
+    include_permutations=False
+):
+    data = []
+
+    for metrics, sign in [(minimized_columns, -1), (maximized_columns, 1)]:
+
+        for metric_name in metrics:
+            observed_value = function_result[metric_name]
+
+            if metric_name not in function_permutations.columns:
+                warn(
+                    f'Skipping {metric_name} (not present in permutations data). '
+                    f'Please reevaluate permutations to include this metric'
+                )
+                continue
+
+            metric_permutations = function_permutations[metric_name]
+
+            more_extreme = (
+                metric_permutations > observed_value
+                if sign == 1 else
+                metric_permutations < observed_value
+            )
+            p_value = sum(more_extreme) / len(metric_permutations)
+
+            datum = {
+                'p_value': p_value,
+                'metric': metric_name,
+                'observed': observed_value,
+            }
+
+            if include_permutations:
+                datum['permutations'] = metric_permutations.tolist()
+
+            data.append(datum)
+
+    return DataFrame(data)
+
+
+def compare_observations_with_permutations(
+    result: DataFrame,
+    permutations: DataFrame,
+    ranked_categories={'indications', 'contraindications', 'controls'},
+    check_functions=True
+):
+    """result = reference result, observed result"""
+    data = []
+
+    maximized_columns = choose_columns(result, maximized_metrics, ranked_categories)
+    minimized_columns = choose_columns(result, minimized_metrics, ranked_categories)
+
+    if check_functions:
+        # do we have same scoring functions in permutations and observations?
+        assert set(result.index) == set(permutations.index)
+
+    for scoring_function in tqdm(permutations.index.unique()):
+        function_result = result.loc[scoring_function]
+        function_permutations = permutations.loc[scoring_function]
+
+        rows = (
+            compare_against_permutations_group(
+                function_result, function_permutations, minimized_columns, maximized_columns,
+                include_permutations=True
+            )
+        )
+
+        rows['scoring_function'] = scoring_function
+
+        data.append(rows)
+
+    return data

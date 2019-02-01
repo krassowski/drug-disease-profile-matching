@@ -5,9 +5,14 @@ from io import StringIO
 from typing import Dict
 from warnings import warn
 
-from pandas import concat, DataFrame, Categorical, Series
+from pandas import concat, DataFrame, Categorical
 from tqdm import tqdm
 
+from data_frames import to_nested_dicts
+from data_sources.drug_connectivity_map import AggregatedScores
+
+from .permutations import compare_against_permutations_group, compare_observations_with_permutations
+from .reevaluation import extract_scores_from_result, extract_single_score, reevaluate
 from .display import maximized_metrics, minimized_metrics, choose_columns
 from .scores_models import Group
 
@@ -48,48 +53,6 @@ def group_permutations_by_subtype(permutations) -> Dict[str, DataFrame]:
     return grouped_by_corresponding_cluster
 
 
-def compare_against_permutations_group(
-    function_result: Series, function_permutations: DataFrame,
-    minimized_columns, maximized_columns,
-    include_permutations=False
-):
-    data = []
-
-    for metrics, sign in [(minimized_columns, -1), (maximized_columns, 1)]:
-
-        for metric_name in metrics:
-            observed_value = function_result[metric_name]
-
-            if metric_name not in function_permutations.columns:
-                warn(
-                    f'Skipping {metric_name} (not present in permutations data). '
-                    f'Please reevaluate permutations to include this metric'
-                )
-                continue
-
-            metric_permutations = function_permutations[metric_name]
-
-            more_extreme = (
-                metric_permutations > observed_value
-                if sign == 1 else
-                metric_permutations < observed_value
-            )
-            p_value = sum(more_extreme) / len(metric_permutations)
-
-            datum = {
-                'p_value': p_value,
-                'metric': metric_name,
-                'observed': observed_value,
-            }
-
-            if include_permutations:
-                datum['permutations'] = metric_permutations.tolist()
-
-            data.append(datum)
-
-    return DataFrame(data)
-
-
 def test_permutations_number_in_subtype(
     result_subtype_subset: DataFrame, subtype_subset: DataFrame, subtype: str,
     ranked_categories={'indications', 'contraindications', 'controls'}
@@ -124,7 +87,7 @@ def test_permutations_number_in_subtype(
     return joined
 
 
-def compare_observations_with_permutations(
+def compare_observations_with_subtype_permutations(
     subtypes_results: Dict[Group, DataFrame],
     permutations: DataFrame,
     ranked_categories={'indications', 'contraindications', 'controls'},
@@ -138,28 +101,14 @@ def compare_observations_with_permutations(
     for subtype, permutations in tqdm(permutations_grouped_by_corresponding_cluster):
         result = subtypes_results[subtype]
 
-        maximized_columns = choose_columns(result, maximized_metrics, ranked_categories)
-        minimized_columns = choose_columns(result, minimized_metrics, ranked_categories)
+        function_results = compare_observations_with_permutations(
+            result, permutations,
+            ranked_categories, check_functions
+        )
 
-        if check_functions:
-            # do we have same scoring functions in permutations and observations?
-            assert set(result.index) == set(permutations.index)
-
-        for scoring_function in tqdm(permutations.index.unique()):
-            function_result = result.loc[scoring_function]
-            function_permutations = permutations.loc[scoring_function]
-
-            rows = (
-                compare_against_permutations_group(
-                    function_result, function_permutations, minimized_columns, maximized_columns,
-                    include_permutations=True
-                )
-            )
-
-            rows['subtype'] = subtype
-            rows['scoring_function'] = scoring_function
-
-            data.append(rows)
+        for function_result in function_results:
+            function_result['subtype'] = subtype
+            data.append(function_result)
 
     df = concat(data)
 
@@ -173,3 +122,54 @@ def compare_observations_with_permutations(
 
     return df
 
+
+def merge_subtypes_results_and_reevaluate(result, strategy, top):
+    assert strategy in {'equal_weight_for_subtypes', 'weight_by_actual_score'}
+
+    should_give_equal_weight_to_subtypes = (strategy == 'equal_weight_for_subtypes')
+
+    extracted_scores = []
+    for subtype, subtype_result in result.items():
+        df = extract_scores_from_result(subtype_result['meta:Scores'])
+        df['subtype'] = subtype
+        extracted_scores.append(df)
+    extracted_scores = concat(extracted_scores)
+
+    scores_dict_by_func_cell_group_subtype = to_nested_dicts(extracted_scores, ['func', 'cell_id', 'group'])
+
+    data = []
+
+    for func, scores_dict_by_cell_group_subtype in scores_dict_by_func_cell_group_subtype.items():
+        scores_dict_by_cell = {}
+        scores_dict_by_cell_subtype_group = to_nested_dicts(
+            extracted_scores.query('func == @func'),
+            ['cell_id', 'subtype', 'group'],
+            extract=extract_single_score
+            # dict_type=NeatNamespace - for visual debugging
+        )
+
+        for cell_id, cell_scores in scores_dict_by_cell_group_subtype.items():
+            cell_dict = {}
+            for group, scores_by_subtype in cell_scores.items():
+                score_series = concat(scores_by_subtype.score.tolist())
+                index = score_series.index
+                # take the best score by substance.
+                cell_dict[group] = AggregatedScores(score_series.groupby(level=list(range(index.nlevels))).max())
+
+            scores_dict_by_cell[cell_id] = cell_dict
+
+        result = reevaluate(
+            scores_dict_by_cell,
+            func,
+            top=top,
+            aggregate=None,  # already aggregated
+            subtypes_scores=scores_dict_by_cell_subtype_group,
+            subtypes_top=(
+                'best_from_each_subtype'
+                if should_give_equal_weight_to_subtypes else
+                None  # weight_by_actual_score is the default action
+            )
+        )
+        data.append({**result, **{'Func': func}})
+
+    return DataFrame(data).set_index('Func')
