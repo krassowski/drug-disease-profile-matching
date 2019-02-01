@@ -11,7 +11,7 @@ from multiprocessing.managers import ListProxy
 
 from .progress_bar import progress_bar
 from .signals import STOP
-from tqdm import tqdm
+from tqdm.auto import tqdm
 
 
 def available_cores():

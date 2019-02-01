@@ -17,7 +17,7 @@ from mpl_toolkits.mplot3d import Axes3D
 from itertools import chain
 from helpers.gui import Namespace, NeatNamespace, HorizontalNamespace
 from helpers.r import *
-from tqdm import tqdm
+from tqdm.auto import tqdm
 from statistics import mean
 from types import SimpleNamespace
 
