@@ -5,6 +5,7 @@ import numpy
 from functools import partial
 
 from pandas import DataFrame, concat, Series
+import pandas
 from operator import attrgetter
 
 from data_frames import is_copy
@@ -16,6 +17,9 @@ from .. import score_signatures
 from ..models import SignaturesGrouping
 from .scores_models import ScoresVector, ProcessedScores, TopScores, Group
 from .metrics import EvaluationMetric, metrics_manager
+
+
+pandas.options.mode.chained_assignment = None
 
 test_warnings = WarningManager()
 
@@ -30,7 +34,7 @@ groups_label_value_map = {
 def transform_to_aggregated_scores_map(
     scores_by_group: Dict[Group, Scores], aggregate: str,
     transform_scores=None
-) -> Dict[int, AggregatedScores]:
+) -> Dict[str, AggregatedScores]:
 
     def verify_aggregated(scores):
         assert isinstance(scores, AggregatedScores)
@@ -48,7 +52,7 @@ def transform_to_aggregated_scores_map(
         scores_by_group = transform_scores(scores_by_group)
 
     return {
-        groups_label_value_map[group]: scores
+        group: scores
         for group, scores in scores_by_group.items()
     }
 
@@ -71,17 +75,13 @@ def evaluation_summary(
 ):
     # TODO: rename top -> top_selection_criteria
 
-    aggregated_scores_by_group_value = transform_to_aggregated_scores_map(scores_dict, aggregate, transform_scores)
-
-    aggregated_scores_by_group_label = {
-        group: aggregated_scores_by_group_value[groups_label_value_map[group]]
-        for group in scores_dict.keys()
-    }
+    aggregated_scores_by_group_label = transform_to_aggregated_scores_map(scores_dict, aggregate, transform_scores)
 
     aggregated_scores_df = concat(
-        aggregated_scores_by_group_value[value].assign(group=group, expected_score=value)
+        aggregated_scores_by_group_label[group].assign(group=group, expected_score=value)
         for group, value in groups_label_value_map.items()
     )
+    aggregated_scores_df['group'] = pandas.Categorical(aggregated_scores_df['group'])
 
     vector = scores_vector(aggregated_scores_df)
 
@@ -94,11 +94,11 @@ def evaluation_summary(
         for subtype, subtype_scores_dict in subtypes_dicts.items():
             subtype_map = transform_to_aggregated_scores_map(subtype_scores_dict, aggregate, transform_scores)
 
-            # contaminate dataframes by in-place assignment to reduce copy operations
+            # contaminate data frames by in-place assignment to reduce copy operations
             for group, value in groups_label_value_map.items():
                 # this is a dict selection, no need to check that copy gets returned
                 # (plus I assume that it will change the data - with little impact)
-                df = subtype_map[value]
+                df = subtype_map[group]
                 df['group'] = group
                 df['expected_score'] = value
 
@@ -115,9 +115,9 @@ def evaluation_summary(
         top_scoring = select_top_substance(vector, how=top)
 
     scores_indications, scores_controls, scores_contraindications = (
-        aggregated_scores_by_group_value[1],
-        aggregated_scores_by_group_value[0],
-        aggregated_scores_by_group_value[-1]
+        aggregated_scores_by_group_label['indications'],
+        aggregated_scores_by_group_label['controls'],
+        aggregated_scores_by_group_label['contraindications']
     )
 
     top = TopScores(
