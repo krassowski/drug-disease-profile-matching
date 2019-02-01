@@ -33,18 +33,23 @@ def pinecone_plot(p: ggplot, observed_column: str, maximized_rows=None, hatch='-
 
     axes = figure.get_axes()
 
-    columns_id = p.facet.cols[0]
-    rows_id = p.facet.rows[0]
-
     data = p.data
 
-    columns = data[columns_id]
-    rows = data[rows_id]
+    try:
+        columns_id = p.facet.cols[0]
+        columns = data[columns_id]
+        assert isinstance(columns.dtype, CategoricalDtype)
+        columns = columns.unique()
+    except IndexError:
+        columns = [None]
 
-    assert isinstance(columns.dtype, CategoricalDtype) and isinstance(rows.dtype, CategoricalDtype)
-
-    columns = columns.unique()
-    rows = rows.unique()
+    try:
+        rows_id = p.facet.rows[0]
+        rows = data[rows_id]
+        assert isinstance(rows.dtype, CategoricalDtype)
+        rows = rows.unique()
+    except IndexError:
+        rows = [None]
 
     categories = p.mapping['x']
     values = p.mapping['y']
@@ -58,8 +63,11 @@ def pinecone_plot(p: ggplot, observed_column: str, maximized_rows=None, hatch='-
 
     for i, a in enumerate(axes):
         row, column = axes_mapping[i]
-        axis_data = data[data[columns_id] == column]
-        axis_data = axis_data[axis_data[rows_id] == row]
+        axis_data = data
+        if column is not None:
+            axis_data = axis_data[axis_data[columns_id] == column]
+        if row is not None:
+            axis_data = axis_data[axis_data[rows_id] == row]
         observed = axis_data[[observed_column, categories]].drop_duplicates().set_index(categories)
         collections = list(a.collections)
 
