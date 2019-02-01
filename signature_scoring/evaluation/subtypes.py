@@ -17,14 +17,35 @@ from .display import maximized_metrics, minimized_metrics, choose_columns
 from .scores_models import Group
 
 
-def subtypes_benchmark(expression, samples_by_subtype, benchmark_function, funcs, *args, samples_mapping=lambda x: x, **kwargs):
+def subtypes_benchmark(
+    expression, samples_by_subtype, benchmark_function, funcs, *args,
+    samples_mapping=lambda x: x, use_all_controls=True, **kwargs
+):
     subtypes_results = {}
 
-    for type, samples in samples_by_subtype.items():
+    if use_all_controls:
+        all_controls = expression[expression.columns[expression.classes == 'normal']]
+        additional_controls = {'additional_controls': all_controls}
+    else:
+        additional_controls = {}
+
+    print(f'Using all controls? {use_all_controls}')
+
+    for subtype, samples in samples_by_subtype.items():
         type_subset = expression[[samples_mapping(sample) for sample in samples]]
-        print(f'Using subset: {type} with {len(type_subset.columns)} samples')
-        differential_subset = type_subset.differential('tumor', 'normal', only_paired=False)
-        subtypes_results[type] = benchmark_function(funcs, differential_subset, *args, **kwargs)
+        print(f'Using subset: {subtype} with {len(type_subset.columns)} samples')
+        if 'normal' not in type_subset.classes and not use_all_controls:
+            print(
+                'No normal subtype-specific samples to create differential expression, '
+                'set use_all_controls=True to include control samples from all subtypes.'
+            )
+            continue
+        differential_subset = type_subset.differential(
+            'tumor', 'normal',
+            only_paired=False,
+            **additional_controls
+        )
+        subtypes_results[subtype] = benchmark_function(funcs, differential_subset, *args, **kwargs)
 
     return subtypes_results
 

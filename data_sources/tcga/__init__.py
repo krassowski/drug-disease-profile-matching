@@ -183,13 +183,16 @@ class ExpressionManager(LayerDataWithSubsets, ExpressionProfile):
         return cases, controls
 
     def differential(self, case_='tumor', control_='normal', metric=signal_to_noise, index_as_bytes=True,
-                     limit_to=None, only_paired=True, nans='fill_0'):
+                     limit_to=None, only_paired=True, nans='fill_0', additional_controls=None):
         print(f'Metric: {metric.__name__}, groups: {case_}, {control_}')
 
         case, control = self.split(case_, control_, only_paired)
+        if additional_controls is not None:
+            control = concat([control, additional_controls], axis=1).T.drop_duplicates().T
         diff = []
 
         if case.empty or control.empty:
+            warn('Case or control is empty')
             return
 
         genes = set(case.index)
@@ -202,7 +205,7 @@ class ExpressionManager(LayerDataWithSubsets, ExpressionProfile):
             for gene in genes:
                 diff.append(metric(case.loc[gene], control.loc[gene]))
         except StatisticsError:
-            print(f'Couldn\'t compute metric: {signal_to_noise} for {case} and {control}')
+            warn(f'Couldn\'t compute metric: {signal_to_noise} for {case} and {control}')
             return
         query_signature = Series(diff, index=genes)
         if nans == 'fill_0':
