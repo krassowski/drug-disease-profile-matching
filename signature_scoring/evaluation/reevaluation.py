@@ -1,8 +1,9 @@
+from collections import defaultdict
 from functools import partial
 from warnings import warn
 
 from numpy import isclose
-from pandas import DataFrame
+from pandas import DataFrame, Series, Categorical
 from pandas.core.dtypes.common import is_numeric_dtype
 
 from data_frames import to_nested_dicts, the_only_one
@@ -26,10 +27,11 @@ def reevaluate(scores_dict_by_cell, scoring_func: ScoringFunction, subtypes_top=
     return data
 
 
-def extract_scores_from_result(result: DataFrame) -> DataFrame:
+def extract_scores_from_result(result: Series) -> DataFrame:
     # TODO: support scoring functions with no cell grouping
     data = []
-    for func, scores in result['meta:Scores'].iteritems():
+
+    for func, scores in result.iteritems():
         for cell_id, cell_scores in scores.__dict__.items():
             # group: indications / contra / controls
             for group, score_series in cell_scores.__dict__.items():
@@ -39,12 +41,13 @@ def extract_scores_from_result(result: DataFrame) -> DataFrame:
                     'group': group,
                     'score': score_series
                 })
+
     return DataFrame(data)
 
 
 def reevaluate_benchmark(old_benchmark: DataFrame, reevaluate_kwargs, verbose=True, keep_scores=True) -> DataFrame:
     # TODO: support scoring functions with no cell grouping
-    scores = extract_scores_from_result(old_benchmark)
+    scores = extract_scores_from_result(old_benchmark['meta:Scores'])
 
     if not any(scores_series.score.any() for scores_series in scores.score):
         warn(f'Skipping re-evaluation for {", ".join(old_benchmark.index)}: no scores in the original result')
@@ -55,6 +58,8 @@ def reevaluate_benchmark(old_benchmark: DataFrame, reevaluate_kwargs, verbose=Tr
         scores, ['func', 'cell_id', 'group'],
         extract=extract_single_score
     )
+
+    del scores
 
     data = []
     for func, scores_dict_by_cell_group in scores_dict_by_func_cell_group_subtype.items():
