@@ -3,6 +3,9 @@ from IPython import get_ipython
 from IPython.display import Audio, display
 
 
+SOUNDS_PATH = '.jupyter-sounds'
+
+
 class InvisibleAudio(Audio):
     def _repr_html_(self):
         audio = super()._repr_html_()
@@ -12,8 +15,8 @@ class InvisibleAudio(Audio):
         
 def play_sound_on_exception(self, etype, value, tb, tb_offset=None):
     self.showtraceback((etype, value, tb), tb_offset=tb_offset)
-    # url='http://www.soundjay.com/button/beep-05.wav'
-    display(InvisibleAudio(filename='jupyter-sounds/beep-05.wav', autoplay=True))
+    # http://www.soundjay.com/button/beep-05.wav
+    display(InvisibleAudio(filename=f'{SOUNDS_PATH}/beep-05.wav', autoplay=True))
 
     
 class Beeper:
@@ -45,8 +48,8 @@ def remove_old_beepers(ipython):
                 ipython.events.unregister(event, callback)
 
 
-#beeper = Beeper(1, url='http://www.soundjay.com/button/beep-07.wav')
-beeper = Beeper(1, filename='.jupyter-sounds/beep-07.wav')
+# http://www.soundjay.com/button/beep-07.wav
+beeper = Beeper(1, filename=f'{SOUNDS_PATH}/beep-07.wav')
 
 ipython = get_ipython()
 remove_old_beepers(ipython)
