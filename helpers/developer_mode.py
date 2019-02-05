@@ -1,9 +1,10 @@
+from pathlib import Path
 from time import time
 from IPython import get_ipython
 from IPython.display import Audio, display
 
 
-SOUNDS_PATH = '.jupyter-sounds'
+SOUNDS_PATH = Path(__file__).parent.parent / '.jupyter-sounds'
 
 
 class InvisibleAudio(Audio):
