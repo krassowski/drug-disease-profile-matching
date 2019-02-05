@@ -10,17 +10,10 @@ from data_sources.data_source import DataSource
 from h5py import File
 from h5py.h5py_warnings import H5pyDeprecationWarning
 
-from models import ExpressionProfile
 from helpers.cache import cached_property
 
 
 warnings.simplefilter("ignore", H5pyDeprecationWarning)
-
-
-class PerturbationProfile(ExpressionProfile):
-
-    def classes(self):
-        pass
 
 
 class DrugConnectivityMap(DataSource):
@@ -391,6 +384,10 @@ def get_controls_for_signatures(ids, genes_to_keep=None):
         if genes_to_keep is not None:
             rows_to_keep = controls.index.isin(genes_to_keep)
             controls = controls[rows_to_keep]
+        if controls.empty:
+            continue
         control = controls.mean(axis=1)
         controls_by_signature[signature_id] = control
-    return DataFrame(controls_by_signature)
+    df = DataFrame(controls_by_signature)
+    assert df.notna().all().all()
+    return df
