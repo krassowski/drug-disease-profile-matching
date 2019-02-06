@@ -1,37 +1,27 @@
 from functools import partial
+from tempfile import NamedTemporaryFile
+from typing import Union, Set
+from warnings import warn
 
-from pandas import concat, Series
+from pandas import concat
 
-from helpers.temp import create_tmp_dir
-from multiprocess.cache_manager import multiprocess_cache_manager
-from methods.gsea import GSEADesktop
 from data_frames import AugmentedDataFrame
-from models import ExpressionProfile
+from data_sources.molecular_signatures_db import MolecularSignaturesDatabase
+from helpers.temp import create_tmp_dir
+from methods.gsea import cudaGSEA
+from methods.gsea.base import GSEA
+from methods.gsea.exceptions import GSEAError, GSEANoResults
+from methods.gsea.java import GSEADesktop
+from multiprocess.cache_manager import multiprocess_cache_manager
 
 from ..models import Profile
-from . import scoring_function
+from ..models.with_controls import ExpressionWithControls, DummyExpressionsWithControls
+from . import scoring_function, ScoringError
 
 GSEA_CACHE = None
 multiprocess_cache_manager.add_cache(globals(), 'GSEA_CACHE', 'dict')
 
 tmp_dir = create_tmp_dir('gsea')
-
-
-class DummyExpressions(ExpressionProfile):
-
-    @classmethod
-    def from_differential(cls, differential, case_name='case', control_name='control'):
-        """Signatures are already differential"""
-        self = cls(differential)
-        self.columns = [case_name]
-        self['control'] = 0
-        self.case_name = case_name
-        self.control_name = control_name
-        return self
-
-    @property
-    def classes(self):
-        return Series([self.case_name, self.control_name])
 
 
 def combine_gsea_results(disease_gene_sets, signature_gene_sets, na_action='fill_0'):
@@ -50,17 +40,56 @@ def combine_gsea_results(disease_gene_sets, signature_gene_sets, na_action='fill
         warn('ES in disease is 0, this will lead to inf scores!')
 
     joined['score'] = (
-            1
-            -
-            (joined.nes_disease + joined.nes_signature) / joined.nes_disease
-            *
-            (1 - joined['fdr_q-val_disease']) * (1 - joined['fdr_q-val_disease'])
+        1
+        -
+        (joined.nes_disease + joined.nes_signature) / joined.nes_disease
+        *
+        (1 - joined['fdr_q-val_disease']) * (1 - joined['fdr_q-val_disease'])
     )
 
     return joined
 
 
-def create_gsea_scorer(gsea_app=GSEADesktop, permutations=500, gene_sets='h.all', q_value_cutoff=0.1, na_action='fill_0', score='mean', normalization=True):
+def cached_gsea_run(
+    gsea_app,
+    gsea, gene_sets, expression: ExpressionWithControls,
+    class_name, warn_when_not_using_cache=False, delete=True
+):
+
+    profile_hash = hash(expression.hashable)
+    key = (gene_sets, profile_hash, class_name, gsea_app.__class__.__name__)
+
+    if key in GSEA_CACHE:
+        results = GSEA_CACHE[key]
+        if results is None:
+            raise GSEANoResults()
+    else:
+        if warn_when_not_using_cache:
+            warn('Warning: not using cache (that\'s fine if it\'s the first run)')
+        results = gsea(
+            expression,
+            out_dir=f'{tmp_dir}/{class_name}',
+            name=str(profile_hash).replace('-', 'm'),
+            delete=delete
+        )
+        # if results is not None:
+        GSEA_CACHE[key] = results
+
+    return results[expression.case_name], results[expression.control_name]
+
+
+DEFAULT_GSEA_APP = GSEADesktop()
+
+
+def create_gsea_scorer(
+    gsea_app: GSEA = DEFAULT_GSEA_APP, permutations=500, gene_sets='h.all',
+    q_value_cutoff=0.1, na_action='fill_0', score='mean',
+    normalization=True, metric='Diff_of_Classes',
+    permutation_type='Gene_set', grouping=None,
+    custom_multiprocessing=False, verbose=False,
+    min_genes=15, max_genes=500, id_type='entrez',
+    genes: Set[str] = None
+):
     """
     na_action: fill_0 or drop
     score: mean, max, sum
@@ -68,61 +97,83 @@ def create_gsea_scorer(gsea_app=GSEADesktop, permutations=500, gene_sets='h.all'
         # max = best effect on a molecular pathway, though might lead to deterioration of certain pathways of the disease.
         # sum =
     """
-    run_gsea_app = gsea_app().run
 
-    def cached_gsea_run(gsea, gene_sets, q_value_cutoff, differential_profile, class_name, warn=False, delete=True):
+    molecular_signatures_db = MolecularSignaturesDatabase()
 
-        profile_hash = hash(differential_profile)
-        key = (gene_sets, q_value_cutoff, profile_hash, class_name)
+    with NamedTemporaryFile(delete=False, dir=tmp_dir, suffix='.gmt') as f:
+        gene_sets_path = f.name
+        matrix = molecular_signatures_db.load(gene_sets, id_type)
+        before = len(matrix.gene_sets)
 
-        if key in GSEA_CACHE:
-            results = GSEA_CACHE[key]
-        else:
-            if warn:
-                print('Warning: not using cache (that\'s fine if it\'s the first run)')
-            dummy_profile = DummyExpressions.from_differential(differential_profile, case_name=class_name)
-            results = gsea(
-                dummy_profile,
-                outdir=f'{tmp_dir}/{class_name}',
-                name=f'{str(profile_hash).replace("-", "m")}',
-                delete=delete
-            )
-            GSEA_CACHE[key] = results
+        if genes:
+            matrix = matrix.subset(genes)
 
-        return results[class_name], results['control']
+        matrix = matrix.trim(min_genes, max_genes)
 
-    @scoring_function
-    def gsea_score(disease_profile: Profile, compound_profile: Profile):
+        if verbose:
+            print(f'Trimmed gene sets database from {before} to {len(matrix.gene_sets)}')
+        matrix.to_gmt(gene_sets_path)
+
+    if isinstance(gsea_app, cudaGSEA) and not genes and (min_genes or max_genes):
+        warn(
+            'Please supplement list of genes on the expression matrix '
+            'to enable correct trimming of the gene sets for cudaGSEA'
+        )
+
+    input = Profile if permutation_type != 'phenotype' else ExpressionWithControls
+    assert permutation_type in {'Gene_set', 'phenotype'}
+
+    def to_dummy_expression(profile: Profile, class_name: str):
+        case_expression = AugmentedDataFrame(
+            concat([profile.top.up, profile.top.down])
+        )
+        return DummyExpressionsWithControls.from_differential(case_expression, case_name=class_name)
+
+    def gsea_score(
+        disease: Union[Profile, ExpressionWithControls],
+        compound: Union[Profile, ExpressionWithControls],
+        warn_about_cache=True
+    ):
         # theoretically this could be replaced with the original data (e.g. tumour/normal for TCGA),
         # though this would be less consistent with how the signature profile is handled and require
         # re-calculation of the differential profile for each GSEA run.
         multiprocess_cache_manager.respawn_cache_if_needed()
 
-        disease_differential = AugmentedDataFrame(
-            concat([disease_profile.top.up, disease_profile.top.down])
-        )
+        if isinstance(disease, Profile):
+            disease_expression = to_dummy_expression(disease, 'disease')
+            compound_expression = to_dummy_expression(compound, 'signature')
+        else:
+            disease_expression = disease
+            compound_expression = compound
 
         gsea = partial(
-            run_gsea_app,
-            gene_sets=gene_sets, id_type='entrez',
-            permutations=permutations, permutation_type='Gene_set',
-            metric='Diff_of_Classes',
-            normalization='meandiv' if normalization else None
+            gsea_app.run,
+            gene_sets=gene_sets_path, id_type=id_type,
+            permutations=permutations, permutation_type=permutation_type,
+            metric=metric,
+            normalization='meandiv' if normalization else None,
+            verbose=verbose,
+            min_genes=min_genes, max_genes=max_genes
         )
 
-        disease_gene_sets_up, disease_gene_sets_dn = cached_gsea_run(
-            gsea, gene_sets, q_value_cutoff, disease_differential, class_name='disease', warn=True
-            # delete=False might be beneficial for single runs (if these were to be restarted after the cache is gone)
-            # but would also fill the disk with permutations quickly
-        )
+        try:
+            disease_gene_sets_up, disease_gene_sets_dn = cached_gsea_run(
+                gsea_app,
+                gsea, gene_sets, disease_expression, class_name='disease',
+                warn_when_not_using_cache=warn_about_cache
+                # delete=False might be beneficial for single runs (if these were to be restarted after the cache is gone)
+                # but would also fill the disk with permutations quickly
+            )
+        except GSEAError as e:
+            raise ScoringError(f'Diseases scoring failed, all the substances are doomed to fail; original error: {e}')
 
-        signature = AugmentedDataFrame(
-            concat([compound_profile.top.up, compound_profile.top.down])
-        )
-
-        signature_gene_sets_up, signature_gene_sets_dn = cached_gsea_run(
-            gsea, gene_sets, q_value_cutoff, signature, class_name='signature'
-        )
+        try:
+            signature_gene_sets_up, signature_gene_sets_dn = cached_gsea_run(
+                gsea_app,
+                gsea, gene_sets, compound_expression, class_name='signature'
+            )
+        except GSEAError:
+            return None
 
         results = [disease_gene_sets_up, disease_gene_sets_dn]
 
@@ -137,7 +188,24 @@ def create_gsea_scorer(gsea_app=GSEADesktop, permutations=500, gene_sets='h.all'
 
         return getattr(joined.score, score)()
 
-    gsea_score.__name__ = f'gsea_{permutations}_{gene_sets}_{score}_{q_value_cutoff}_{na_action}_{normalization}'
+    gsea_score.metadata = {
+        'app': gsea_app.__class__.__name__,
+        'permutations': permutations,
+        'gene_sets': gene_sets,
+        'score_calculation': score,
+        'q_value_cutoff': q_value_cutoff,
+        'na_action': na_action,
+        'normalization': normalization,
+        'permutation_type': permutation_type,
+        'metric': metric
+    }
 
-    return gsea_score
+    gsea_score.__name__ = '_'.join(map(str, gsea_score.metadata.values()))
+
+    return scoring_function(
+        gsea_score, input=input, grouping=grouping,
+        custom_multiprocessing=custom_multiprocessing,
+        before_batch=lambda: gsea_app.prepare_output(),
+        supports_cache=True
+    )
 

@@ -1,13 +1,13 @@
 from pandas import DataFrame
-from rpy2.rinterface._rinterface import RRuntimeError
+from rpy2.rinterface import RRuntimeError
 from rpy2.robjects import r, globalenv
 from rpy2.robjects import StrVector, ListVector
 from rpy2.robjects.packages import importr
 
-from methods.gsea import MolecularSignaturesDatabase
+from data_sources.molecular_signatures_db import MolecularSignaturesDatabase
 from multiprocess.cache_manager import multiprocess_cache_manager
 
-from ..models import ExpressionWithControls
+from ..models.with_controls import ExpressionWithControls
 from . import scoring_function
 from .gsea import combine_gsea_results
 
@@ -62,7 +62,7 @@ def create_roast_scorer(
 
     gene_sets_r = ListVector({
         gene_set.name: StrVector(list(gene_set.genes))
-        for gene_set in db.load(gene_sets=gene_sets, id_type=id_type)
+        for gene_set in db.load(gene_sets=gene_sets, id_type=id_type).gene_sets
     })
 
     def roast_score(disease: ExpressionWithControls, compound: ExpressionWithControls):

@@ -3,7 +3,7 @@ from time import time
 
 from pandas import DataFrame
 from tqdm import tqdm_notebook
-from ..models import ExpressionWithControls
+from ..models.with_controls import ExpressionWithControls
 from . import evaluate
 
 

@@ -10,6 +10,8 @@ from multiprocess import Pool
 from multiprocess.cache_manager import multiprocess_cache_manager
 
 from ..models import Signature, Profile, SignaturesGrouping
+from ..scoring_functions import ScoringFunction
+
 
 CACHE = None
 multiprocess_cache_manager.add_cache(globals(), 'CACHE', 'dict')
@@ -61,7 +63,9 @@ class SignatureProcessor:
         return signature
 
     def score_signature_group(
-        self, signature_id, disease_profile, rows_of_selected_genes, limit, scoring_func, gene_selection
+        self, signature_id, disease_profile, rows_of_selected_genes, limit,
+        scoring_func: ScoringFunction, gene_selection,
+        warn_about_cache=True
     ):
         signature = self.get_signature_group(signature_id)
         signature = signature[rows_of_selected_genes]
@@ -78,8 +82,13 @@ class SignatureProcessor:
             #  How? One idea: take the means/medians of gene values and choose n best genes.
 
         args = {}
+
         if scoring_func.custom_multiprocessing:
-            args = {'cores': self.processes}
+            args['cores'] = self.processes
+
+        if scoring_func.supports_cache:
+            args['warn_about_cache'] = warn_about_cache
+
         score = scoring_func(disease_profile, compound_profile, **args)
 
         del signature, compound_profile
@@ -170,6 +179,12 @@ class SignatureProcessor:
                 shared_args=shared_args
             )
         )
+
+        scores = [
+            (signature_id, score)
+            for signature_id, score in scores
+            if score is not None
+        ]
 
         if scoring_func.grouping:
             return Scores.from_grouped_signatures(scores)

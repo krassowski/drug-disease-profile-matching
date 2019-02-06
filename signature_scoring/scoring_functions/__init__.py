@@ -3,9 +3,10 @@ from typing import Type
 from dataclasses import dataclass
 
 from ..models import (
-    ExpressionWithControls, Profile,
-    SignaturesGrouping, SubstancesCollectionWithControls, SignaturesCollection
+    Profile,
+    SignaturesGrouping, SignaturesCollection
 )
+from signature_scoring.models.with_controls import ExpressionWithControls, SubstancesCollectionWithControls
 
 
 @dataclass
@@ -41,6 +42,15 @@ class ScoringFunction:
 
     multiprocessing_exclude_first: bool = True
 
+    # a hook to run janitorial tasks (garbage collection, display preparation)
+    # before start of a larger batch of tasks; completely optional
+    before_batch: FunctionType = lambda: None
+
+    # if a function supports results caching then
+    # its func should accept additional keyword argument:
+    #   warn_about_cache: bool
+    supports_cache: bool = None
+
     @property
     def collection(self) -> Type[SignaturesGrouping]:
         """Provides constructor which (when applied to SignaturesData)
@@ -70,3 +80,7 @@ def scoring_function(func, **kwargs):
     if hasattr(func, '__source__'):
         proxy.__source__ = func.__source__
     return proxy
+
+
+class ScoringError(Exception):
+    pass

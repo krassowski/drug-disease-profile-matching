@@ -14,6 +14,7 @@ from helpers.gui.namespace import NeatNamespace
 from helpers import WarningManager
 
 from .. import score_signatures
+from ..scoring_functions import ScoringFunction, ScoringError
 from ..models import SignaturesGrouping
 from .scores_models import ScoresVector, ProcessedScores, TopScores, Group
 from .metrics import EvaluationMetric, metrics_manager
@@ -259,7 +260,7 @@ def summarize_across_cell_lines(summarize_test: FunctionType, scores_dict_by_cel
 
 
 def evaluate(
-    scoring_func, query_signature, indications_signatures, contraindications_signatures,
+    scoring_func: ScoringFunction, query_signature, indications_signatures, contraindications_signatures,
     control_signatures=None, aggregate='mean_per_substance_dose_and_cell', top='rescaled',
     cell_lines_ratio=0.9, summary='per_cell_line_combined', fold_changes=False,
     reset_warnings=True, **kwargs
@@ -269,6 +270,8 @@ def evaluate(
     """
     if reset_warnings:
         test_warnings.reset()
+
+    scoring_func.before_batch()
 
     signatures_map = {
         'indications': indications_signatures,
@@ -309,7 +312,12 @@ def evaluate(
                 [column for column in signatures.signature_ids if column not in signatures_to_keep]
             )
 
-    scores_dict = calculate_scores(query_signature, signatures_map, scoring_func, fold_changes, **kwargs)
+    try:
+        scores_dict = calculate_scores(query_signature, signatures_map, scoring_func, fold_changes, **kwargs)
+    except ScoringError as e:
+        from warnings import warn
+        warn(e)
+        return DataFrame()
 
     summarize_test = partial(evaluation_summary, top=top, aggregate=aggregate)
 

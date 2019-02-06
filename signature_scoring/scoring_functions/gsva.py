@@ -10,10 +10,11 @@ from rpy2.robjects import r
 from rpy2.robjects.packages import importr
 
 from helpers.temp import create_tmp_dir
-from methods.gsea import MolecularSignaturesDatabase
+from data_sources.molecular_signatures_db import MolecularSignaturesDatabase
 from multiprocess.cache_manager import multiprocess_cache_manager
 
-from ..models import ExpressionWithControls, Profile
+from ..models import Profile
+from ..models.with_controls import ExpressionWithControls
 from . import scoring_function
 from .gsea import combine_gsea_results
 
