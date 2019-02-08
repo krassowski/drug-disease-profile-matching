@@ -13,11 +13,12 @@ from methods.gsea.exceptions import GSEANoResults
 class cudaGSEA(GSEA):
     path = third_party_dir / 'cudaGSEA/cudaGSEA/src/cudaGSEA'
 
-    def __init__(self, fdr='full', **kwargs):
+    def __init__(self, fdr='full', use_cpu=False, **kwargs):
         super().__init__(**kwargs)
         assert self.path.exists()
         self.fdr = fdr
         self.log_tail = []
+        self.use_cpu = use_cpu
 
     def read_from_process(self, process, handlers=None, verbose=False):
 
@@ -85,6 +86,7 @@ class cudaGSEA(GSEA):
             f' -metric {metric}'
             ' -order descending'
             f' -fdr {self.fdr}'
+            + (' -cpu' if self.use_cpu else '')
         )
         results = self.run_in_subprocess(command, verbose=verbose)
 
