@@ -53,13 +53,18 @@ def combine_gsea_results(disease_gene_sets, signature_gene_sets, na_action='fill
 def cached_gsea_run(
     gsea_app,
     gsea, gene_sets, expression: ExpressionWithControls,
-    class_name, warn_when_not_using_cache=False, delete=True
+    class_name, warn_when_not_using_cache=False, delete=True,
+    cache=True
 ):
 
     profile_hash = hash(expression.hashable)
-    key = (gene_sets, profile_hash, class_name, gsea_app.__class__.__name__)
+    key = (
+        gene_sets, profile_hash, class_name,
+        gsea_app.__class__.__name__, *gsea.args,
+        tuple(tuple(i) for i in gsea.keywords.items())
+    )
 
-    if key in GSEA_CACHE:
+    if cache and key in GSEA_CACHE:
         results = GSEA_CACHE[key]
         if results is None:
             raise GSEANoResults()
@@ -72,8 +77,8 @@ def cached_gsea_run(
             name=str(profile_hash).replace('-', 'm'),
             delete=delete
         )
-        # if results is not None:
-        GSEA_CACHE[key] = results
+        if cache:
+            GSEA_CACHE[key] = results
 
     return results[expression.case_name], results[expression.control_name]
 
@@ -88,7 +93,7 @@ def create_gsea_scorer(
     permutation_type='Gene_set', grouping=None,
     custom_multiprocessing=False, verbose=False,
     min_genes=15, max_genes=500, id_type='entrez',
-    genes: Set[str] = None
+    genes: Set[str] = None, cache=True
 ):
     """
     na_action: fill_0 or drop
@@ -134,9 +139,6 @@ def create_gsea_scorer(
         compound: Union[Profile, ExpressionWithControls],
         warn_about_cache=True
     ):
-        # theoretically this could be replaced with the original data (e.g. tumour/normal for TCGA),
-        # though this would be less consistent with how the signature profile is handled and require
-        # re-calculation of the differential profile for each GSEA run.
         multiprocess_cache_manager.respawn_cache_if_needed()
 
         if isinstance(disease, Profile):
@@ -160,7 +162,8 @@ def create_gsea_scorer(
             disease_gene_sets_up, disease_gene_sets_dn = cached_gsea_run(
                 gsea_app,
                 gsea, gene_sets, disease_expression, class_name='disease',
-                warn_when_not_using_cache=warn_about_cache
+                warn_when_not_using_cache=warn_about_cache,
+                cache=cache
                 # delete=False might be beneficial for single runs (if these were to be restarted after the cache is gone)
                 # but would also fill the disk with permutations quickly
             )
@@ -170,7 +173,8 @@ def create_gsea_scorer(
         try:
             signature_gene_sets_up, signature_gene_sets_dn = cached_gsea_run(
                 gsea_app,
-                gsea, gene_sets, compound_expression, class_name='signature'
+                gsea, gene_sets, compound_expression, class_name='signature',
+                cache=cache
             )
         except GSEAError:
             return None
