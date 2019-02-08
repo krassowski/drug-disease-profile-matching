@@ -1,11 +1,11 @@
 import re
 from glob import glob
-from os import remove
 from pathlib import Path
 from shutil import rmtree
 from tempfile import TemporaryDirectory
 
-from pandas import read_table
+from IPython.core.display import display
+from pandas import read_table, DataFrame
 
 from config import third_party_dir
 
@@ -39,19 +39,25 @@ class GSEADesktop(GSEA):
 
         results = {}
         for class_type in set(expression_data.classes):
-            result = read_table(f'{out_dir}/{name}.Gsea.{newest}/gsea_report_for_{class_type}_{newest}.xls')
+            path = f'{out_dir}/{name}.Gsea.{newest}/gsea_report_for_{class_type}_{newest}.xls'
+            result: DataFrame = read_table(path)
             assert all(result['Unnamed: 11'].isnull())
             result.drop('Unnamed: 11', axis='columns', inplace=True)
             result.columns = [column.lower().replace(' ', '_') for column in result.columns]
             result.drop('gs<br>_follow_link_to_msigdb', axis='columns', inplace=True)
             result.set_index('name', inplace=True)
-            results[class_type] = result
+            results[class_type] = result.dropna(subset=['nes', 'fdr_q-val'])
 
         if delete:
             rmtree(f'{out_dir}/{name}.Gsea.{newest}', ignore_errors=True)
 
-        assert (results[expression_data.case_name].nes > 0).all()
-        assert (results[expression_data.control_name].nes < 0).all()
+        try:
+            assert (results[expression_data.case_name].nes > 0).all()
+            assert (results[expression_data.control_name].nes < 0).all()
+        except AssertionError:
+            display(results[expression_data.case_name])
+            display(results[expression_data.control_name])
+            raise
 
         return results
 
@@ -127,9 +133,3 @@ class GSEADesktop(GSEA):
             self.clean_up(data_path, classes_path)
 
         return results
-
-    @staticmethod
-    def clean_up(data_path, classes_path):
-        remove(data_path)
-        remove(classes_path)
-

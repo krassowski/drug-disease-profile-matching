@@ -1,5 +1,6 @@
 from copy import copy
 from os import makedirs
+from os import remove
 from pathlib import Path
 from subprocess import Popen, PIPE
 from tempfile import NamedTemporaryFile
@@ -106,3 +107,8 @@ class GSEA(ABC):
         if not self.has_enough_samples_for_metric(expression_data, metric):
             warn(f'Too few samples for the metric {metric}')
             raise GSEANotEnoughSamples(f'Too few samples for the metric {metric}')
+
+    @staticmethod
+    def clean_up(data_path, classes_path):
+        remove(data_path)
+        remove(classes_path)

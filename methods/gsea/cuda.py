@@ -13,9 +13,10 @@ from methods.gsea.exceptions import GSEANoResults
 class cudaGSEA(GSEA):
     path = third_party_dir / 'cudaGSEA/cudaGSEA/src/cudaGSEA'
 
-    def __init__(self, **kwargs):
+    def __init__(self, fdr='full', **kwargs):
         super().__init__(**kwargs)
         assert self.path.exists()
+        self.fdr = fdr
         self.log_tail = []
 
     def read_from_process(self, process, handlers=None, verbose=False):
@@ -64,7 +65,7 @@ class cudaGSEA(GSEA):
         self, expression_data: ExpressionWithControls, gene_sets: str,
         metric='twopass_signal2noise', id_type='symbols',
         permutations=1000, permutation_type='phenotype',
-        verbose=False, **kwargs
+        verbose=False, delete=True, **kwargs
     ):
         super().run(expression_data, gene_sets, metric=metric)
 
@@ -83,8 +84,12 @@ class cudaGSEA(GSEA):
             f' -nperm {permutations}'
             f' -metric {metric}'
             ' -order descending'
+            f' -fdr {self.fdr}'
         )
         results = self.run_in_subprocess(command, verbose=verbose)
+
+        if delete:
+            self.clean_up(data_path, classes_path)
 
         cuda_pitfalls_warning = (
             'There might be an error with CUDA (especially after waking the computer up from sleep); '
@@ -94,7 +99,7 @@ class cudaGSEA(GSEA):
 
         if results.empty:
             last_line = self.log_tail[-1]
-            if 'Error' in last_line:
+            if 'error' in last_line.lower():
                 if not verbose:
                     print('Command:', command)
                 if 'Error: duplicate symbol' in last_line:
@@ -103,7 +108,7 @@ class cudaGSEA(GSEA):
                         'by having an empty column in the data. Please inspect this data frame: '
                     )
                     print(expression_data.joined)
-                else:
+                if 'CUDA error' in last_line:
                     warn(cuda_pitfalls_warning)
             print('Tail of the logs:')
             print(self.log_tail)
