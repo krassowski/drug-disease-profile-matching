@@ -29,8 +29,7 @@ try:
             self.buffer.append(text)
             with self.output:
                 clear_output(wait=True)
-                for e in self.buffer:
-                    display(e)
+                display(*self.buffer)
 
 except ImportError:
 
