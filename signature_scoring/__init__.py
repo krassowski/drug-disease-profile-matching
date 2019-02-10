@@ -8,7 +8,7 @@ from .processor.fold_change import FoldChangeSignatureProcessor
 def score_signatures(
     scoring_func, disease_signature, signatures=None, limit=500, gene_subset=None,
     fold_changes=False, scale=False, progress=False, processes=None,
-    gene_selection=Series.nlargest, warning_manager=None
+    gene_selection=Series.nlargest, warning_manager=None, force_multiprocess_all=False
 ):
     processor_type = SignatureProcessor
 
@@ -23,6 +23,7 @@ def score_signatures(
         processes
     )
     return processor.score_signatures(
-        scoring_func, disease_signature, limit, gene_subset, scale, gene_selection
+        scoring_func, disease_signature, limit, gene_subset, scale, gene_selection,
+        force_multiprocess_all=force_multiprocess_all
     )
 

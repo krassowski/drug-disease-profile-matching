@@ -129,7 +129,7 @@ class SignatureProcessor:
 
     def score_signatures(
         self, scoring_func, disease_signature, limit=500, gene_subset=None,
-        scale=False, gene_selection=Series.nlargest,
+        scale=False, gene_selection=Series.nlargest, force_multiprocess_all=False
     ):
         # scaling will be performed in transform_signature
         self.scale = scale
@@ -158,7 +158,7 @@ class SignatureProcessor:
         start = 0
         scores = []
 
-        if scoring_func.multiprocessing_exclude_first:
+        if scoring_func.multiprocessing_exclude_first and not force_multiprocess_all:
             # first signature is scored in one process,
             # so that the common cache is populated
             # without repetition of calculations
