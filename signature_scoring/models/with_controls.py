@@ -2,7 +2,7 @@ from collections import UserDict
 from copy import copy
 from typing import TextIO
 
-from pandas import DataFrame, Series, concat
+from pandas import DataFrame, Series, concat, np
 
 from data_frames import AugmentedDataFrame
 from data_sources.drug_connectivity_map import get_controls_for_signatures, SignaturesData
@@ -45,14 +45,58 @@ class ExpressionWithControls(ScoringInput, ExpressionProfile):
         f.write(f'# {" ".join(classes_set)}\n')
         f.write(' '.join(classes))
 
-    def to_gct(self, f: TextIO):
+    def to_gct(self, f: TextIO, tabular_writer='to_txt'):
         f.write('#1.2\n')
         expression_data = self.joined
         assert expression_data.notnull().all().all()
         f.write(f'{len(expression_data)}\t{len(expression_data.columns)}\n')
-        self.to_txt(f, expression_data)
+        getattr(self, tabular_writer)(f, expression_data)
 
     def to_txt(self, f: TextIO, expression_data=None):
+        if expression_data is None:
+            expression_data = self.joined
+        columns = expression_data.columns
+        expression_data['Description'] = 'na'
+        expression_data = expression_data[['Description', *columns]]
+        if type(expression_data.index[0]) is bytes:
+            expression_data.index = [b.decode('utf-8') for b in expression_data.index]
+        expression_data.index = expression_data.index.astype(int)
+        expression_data.index.name = 'gene'
+        header = '\t'.join([expression_data.index.name, *expression_data.columns]) + '\n'
+        f.write(header)
+
+        # 13.1 s
+        np.savetxt(
+            f,
+            expression_data.reset_index().values,
+            delimiter='\t',
+            # entrez_id (integer), 'na' (not a description, str), *data (floats)
+            fmt='%d\t%s' + ('\t%f' * (len(expression_data.columns) - 1))
+        )
+
+        # 19.6 s
+        # expression_data = expression_data.astype(str)
+        # for l in expression_data.itertuples():
+        #    f.write('\t'.join(l) + '\n')
+
+        # 19.3 s
+        # lines = []
+        # for l in expression_data.itertuples():
+        #     lines.append('\t'.join(l))
+        # f.write('\n'.join(lines))
+
+        # 21.6 s
+        # for l in expression_data.index.str.cat(expression_data, sep='\t'):
+        #     f.write(l + '\n')
+
+        # 21.1 s
+        #  for l in zip(*[expression_data.index, *[expression_data[column] for column in expression_data.columns]]):
+        #    f.write('\t'.join(l) + '\n')
+
+        # 36.7 s
+        # expression_data.to_csv(f.name, sep='\t', mode='a')
+
+    def to_txt_naive(self, f: TextIO, expression_data=None):
         if expression_data is None:
             expression_data = self.joined
 
