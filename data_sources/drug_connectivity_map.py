@@ -372,6 +372,33 @@ class SignaturesData(MyDataFrame):
             metadata = metadata[metadata['cell_id'] == cell_line]
         return metadata[metadata[class_type] == class_name].sig_id
 
+    def signatures_with_at_least_n_samples(self, n: int):
+        substances = self.classes()
+
+        substances_to_include = {
+            substances
+            for substances, signatures_count in substances.value_counts().items()
+            if signatures_count >= n
+        }
+
+        selected_signatures = []
+        for substance in substances_to_include:
+            selected_signatures.extend(
+                self.members_of_class(substance)
+            )
+        return selected_signatures
+
+    def substances_with_at_least_n_cases_and_controls(self, n: int):
+        # cull by cases number (signatures)
+        selected_signatures = self.signatures_with_at_least_n_samples(n)
+
+        # cull by controls number
+        control_signatures = get_controls_for_signatures(tuple(sorted(selected_signatures)))
+        control_signatures = SignaturesData(control_signatures)
+
+        selected_signatures = control_signatures.signatures_with_at_least_n_samples(n)
+        return self[selected_signatures]
+
 
 dcm = DrugConnectivityMap()
 
