@@ -1,4 +1,4 @@
-from pandas import read_excel
+from pandas import read_excel, np
 from rpy2.robjects.packages import importr
 from rpy2.robjects.pandas2ri import ri2py
 
@@ -20,18 +20,20 @@ class PanCancerAtlas(DataSource):
         print(f'Please refer to {self.url} for the source of data for specific cohorts')
         pan_cancer_subtypes = self.tcga_biolinks.PanCancerAtlas_subtypes()
         pan_cancer_subtypes = ri2py(pan_cancer_subtypes)
+        pan_cancer_subtypes = pan_cancer_subtypes.replace({'NA': np.nan})
 
         self.tcga.add_participant_column(pan_cancer_subtypes, 'pan.samplesID')
 
-        return AugmentedDataFrame(pan_cancer_subtypes)
+        return AugmentedDataFrame(pan_cancer_subtypes).normalize_columns()
 
     def subtypes_integrative(self, tumor):
         pan_cancer_subtypes = self.tcga_biolinks.TCGAquery_subtype(tumor=tumor)
         pan_cancer_subtypes = ri2py(pan_cancer_subtypes)
+        pan_cancer_subtypes = pan_cancer_subtypes.replace({'NA': np.nan})
 
         self.tcga.add_participant_column(pan_cancer_subtypes, 'patient')
 
-        return pan_cancer_subtypes
+        return AugmentedDataFrame(pan_cancer_subtypes).normalize_columns()
 
     def icluster(self):
         df = read_excel(DATA_DIR + '/stratification/mmc6.xlsx', skiprows=1)
@@ -44,4 +46,4 @@ class PanCancerAtlas(DataSource):
         # no duplicate participants
         assert not df_with_participants.participant.duplicated().any()
 
-        return df_with_participants
+        return AugmentedDataFrame(df_with_participants).normalize_columns()

@@ -1,3 +1,5 @@
+import re
+
 from pandas import DataFrame, Series
 
 from helpers.gui.namespace import HorizontalNamespace
@@ -7,7 +9,11 @@ from helpers.cache import power_hash
 class AugmentedDataFrame(DataFrame):
 
     def normalize_columns(self):
-        self.columns = [c.lower().replace(' ', '_') for c in self.columns]
+        self.columns = [
+            re.sub(r'( |\.|-)', '_', c.lower())
+            for c in self.columns
+        ]
+        return self
 
     def having(self=None, **kwargs):
 
