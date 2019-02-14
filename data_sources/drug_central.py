@@ -1,12 +1,9 @@
 from pandas import DataFrame
 from sqlalchemy.ext.automap import automap_base
 from sqlalchemy import create_engine, MetaData
-import re
 from sqlalchemy_utils import generic_repr
-import inflect
-import warnings
 from sqlalchemy.orm import scoped_session, sessionmaker
-
+from thirdparty.sqlalchemy import name_for_scalar_relationship, pluralize_collection, camelize_classname
 
 m = MetaData()
 Base = generic_repr(automap_base(metadata=m))
@@ -31,48 +28,6 @@ Base._repr_html_ = _repr_html_
 engine = create_engine("postgresql+psycopg2://drugcentral:password@localhost/drugcentral")
 
 m.reflect(engine, views=True)
-
-
-# TODO: move to thirdparty and add Licence
-# code below is based on snippets from documentation of sqlalchemy
-# # https://docs.sqlalchemy.org/en/latest/orm/extensions/automap.html
-def name_for_scalar_relationship(base, local_cls, referred_cls, constraint):
-    name = referred_cls.__name__.lower()
-    local_table = local_cls.__table__
-    if name in local_table.columns:
-        newname = name + "_"
-        warnings.warn(f'Already detected name {name} present.  using {newname}')
-        return newname
-    return name
-
-
-_pluralizer = inflect.engine()
-
-
-def pluralize_collection(base, local_cls, referred_cls, constraint):
-    "Produce an 'uncamelized', 'pluralized' class name, e.g. "
-    "'SomeTerm' -> 'some_terms'"
-
-    referred_name = referred_cls.__name__
-    uncamelized = re.sub(r'[A-Z]',
-                         lambda m: "_%s" % m.group(0).lower(),
-                         referred_name)[1:]
-    pluralized = _pluralizer.plural(uncamelized)
-    return pluralized
-
-
-def camelize_classname(base, tablename, table):
-    "Produce a 'camelized' class name, e.g. "
-    "'words_and_underscores' -> 'WordsAndUnderscores'"
-
-    return str(tablename[0].upper() + \
-            re.sub(r'_([a-z])', lambda m: m.group(1).upper(), tablename[1:]))
-
-
-def make_collection_name(base, local_cls, referred_cls, constraint):
-    if local_cls is referred_cls:
-        return constraint.columns.keys()[0] + "_collection"
-
 
 # reflect the tables
 omop_relationship_doid_view = m.tables['omop_relationship_doid_view']
