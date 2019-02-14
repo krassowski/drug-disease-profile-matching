@@ -41,7 +41,7 @@ def name_for_scalar_relationship(base, local_cls, referred_cls, constraint):
     local_table = local_cls.__table__
     if name in local_table.columns:
         newname = name + "_"
-        warnings.warn('Already detected name {name} present.  using {newname}')
+        warnings.warn(f'Already detected name {name} present.  using {newname}')
         return newname
     return name
 
