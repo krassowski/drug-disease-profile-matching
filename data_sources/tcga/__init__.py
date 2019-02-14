@@ -1,5 +1,8 @@
 from collections import defaultdict, UserList
+from contextlib import contextmanager
+from glob import glob
 from statistics import StatisticsError
+from tarfile import TarFile
 from typing import Union
 from warnings import warn
 
@@ -215,42 +218,18 @@ class ExpressionManager(LayerDataWithSubsets, ExpressionProfile):
         return query_signature
 
 
-class TCGA(DataSource):
-    
-    # 'clinical', 'rnaseq', 'mutations', 'RPPA', 'mRNA', 'miRNASeq', 'methylation', 'isoforms'
+class TCGAExpression(DataSource):
 
-    path = DATA_DIR + '/tcga'
+    path_template = '{self.path}/gdac.broadinstitute.org_{cancer_type}.Merge_rnaseqv2__illuminahiseq_rnaseqv2__unc_edu__Level_3__RSEM_genes_normalized__data.Level_3.2016012800.0.0.tar.gz'
 
-    def add_participant_column(self, df: Union[Layer, LayerData], column: str= 'tumor_sample_barcode'):
-        if 'participant' not in df.columns:
-            df['participant'] = [
-                TCGABarcode(barcode).participant
-                for barcode in getattr(df, column)
-            ]
-        return df
+    def __init__(self, path):
+        self.path = path
 
-    def clinical(self, cancer_type, mode='simple') -> Layer:
-        clinical_data = read_table(
-            f'{DATA_DIR}/tcga/gdac.broadinstitute.org_'
-            f'{cancer_type}.Clinical_Pick_Tier1.Level_4.2016012800.0.0/'
-            + (
-                f'{cancer_type}.clin.merged.picked.txt'
-                if mode == 'simple'
-                else 'All_CDEs.txt'
-            ),
-            index_col=[0]
-        )
-        clinical_data.columns = clinical_data.columns.str.upper()
-        clinical_data = clinical_data.T
-        clinical_data = self.add_participant_column(clinical_data, column='index')
-        return Layer(clinical_data)
+    @contextmanager
+    def _get_expression_file(self, cancer_type):
 
-    def expression(self, cancer_type, index='hugo_symbol') -> Layer:
+        path = self.path_template.format(self=self, cancer_type=cancer_type)
 
-        # path = f'{self.path}/{cancer_type}.rnaseqv2__illuminahiseq_rnaseqv2__unc_edu__Level_3__RSEM_genes_normalized__data.data.txt.gz'
-        path = f'{self.path}/gdac.broadinstitute.org_{cancer_type}.Merge_rnaseqv2__illuminahiseq_rnaseqv2__unc_edu__Level_3__RSEM_genes_normalized__data.Level_3.2016012800.0.0.tar.gz'
-
-        from tarfile import TarFile
         with TarFile.open(path) as tar:
             member = tar.getmember(
                 f'gdac.broadinstitute.org_{cancer_type}.'
@@ -260,14 +239,13 @@ class TCGA(DataSource):
                 f'{cancer_type}.rnaseqv2__illuminahiseq_rnaseqv2'
                 f'__unc_edu__Level_3__RSEM_genes_normalized__data.data.txt'
             )
-            f = tar.extractfile(member)
+            yield tar.extractfile(member)
 
+    def data(self, cancer_type, index='entrez_gene_id') -> Layer:
+
+        with self._get_expression_file(cancer_type) as f:
             # verify the first row which specifies the type of measurements
-            mrna = read_table(
-                f,
-                index_col=0,
-                nrows=1,
-            )
+            mrna = read_table(f, index_col=0, nrows=1)
 
             assert set(mrna.loc['gene_id']) == {'normalized_count'}
 
@@ -275,7 +253,6 @@ class TCGA(DataSource):
 
             mrna = read_table(
                 f,
-                #engine='python',
                 index_col=0,
                 skiprows=[1]  # skip the measurements row as this is the only non-numeric row which prevents pandas from
                 # correct casting of the value to float64
@@ -297,6 +274,61 @@ class TCGA(DataSource):
                 print(column)
 
         return ExpressionManager(mrna, name=f'{cancer_type} expression')
+
+    def genes(self, cancer_type, index='entrez_gene_id') -> Series:
+
+        with self._get_expression_file(cancer_type) as f:
+
+            mrna_index = read_table(f, usecols=[0], skiprows=[1], index_col=0)
+
+        genes = {}
+        mrna_index.index.name = index
+        genes['hugo_symbol'], genes['entrez_gene_id'] = mrna_index.index.str.split('|', 1).str
+        return genes[index]
+
+    def cohorts(self):
+        """Returns cohorts with downloaded expression data"""
+        glob_path = self.path_template.format(self=self, cancer_type='*')
+        prefix_len, suffix_len = map(len, glob_path.split('*'))
+        return [
+            path[prefix_len:-suffix_len]
+            for path in glob(glob_path)
+        ]
+
+
+class TCGA(DataSource):
+
+    # 'clinical', 'rnaseq', 'mutations', 'RPPA', 'mRNA', 'miRNASeq', 'methylation', 'isoforms'
+
+    path = DATA_DIR + '/tcga'
+
+    def add_participant_column(self, df: Union[Layer, LayerData], column: str= 'tumor_sample_barcode'):
+        if 'participant' not in df.columns:
+            df['participant'] = [
+                TCGABarcode(barcode).participant
+                for barcode in getattr(df, column)
+            ]
+        return df
+
+    @property
+    def expression(self) -> TCGAExpression:
+        return TCGAExpression(self.path)
+
+    def clinical(self, cancer_type, mode='simple') -> Layer:
+        clinical_data = read_table(
+            f'{DATA_DIR}/tcga/gdac.broadinstitute.org_'
+            f'{cancer_type}.Clinical_Pick_Tier1.Level_4.2016012800.0.0/'
+            + (
+                f'{cancer_type}.clin.merged.picked.txt'
+                if mode == 'simple'
+                else 'All_CDEs.txt'
+            ),
+            index_col=[0]
+        )
+        clinical_data.columns = clinical_data.columns.str.upper()
+        clinical_data = clinical_data.T
+        clinical_data = self.add_participant_column(clinical_data, column='index')
+        return Layer(clinical_data)
 
     def mutations(self, cancer_type, participants=None, barcodes=None):
         paths = self._locate_files(
