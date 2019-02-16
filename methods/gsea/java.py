@@ -70,6 +70,7 @@ class GSEADesktop(GSEA):
         # GSEADesktop-specific
         collapse=True, mode='Max_probe', detailed_sets_analysis=False, out_dir=None,
         plot_top_x=0, name='my_analysis', normalization='meandiv', min_genes=15, max_genes=500,
+        sort='real',
         # internal, won't be passed to GSEA
         use_existing=False, delete=True,
         # additional arguments to be passed
@@ -114,7 +115,7 @@ class GSEADesktop(GSEA):
                 f' -nperm {permutations} -permute {permutation_type} -rnd_type no_balance'
                 f' -scoring_scheme weighted -rpt_label {name}'
                 f' -metric {metric}'
-                ' -sort real -order descending'
+                f' -sort {sort} -order descending'
                 ' -create_gcts false -create_svgs false'
                 # ' -include_only_symbols true'
                 f' -make_sets {str(detailed_sets_analysis).lower()} -median false -num 100'
