@@ -5,16 +5,35 @@ from typing import Tuple
 from pandas import Series, concat, Index
 
 from data_frames import AugmentedSeries, AugmentedDataFrame
+from helpers.cache import hash_series, fast_series_cache_decorator
 
 
 class Signature(AugmentedSeries):
 
+    # cache may explode memory... but should be of great benefit to benchmarking / permutations
+    @fast_series_cache_decorator
     def split(self, limit: int, nlargest=Series.nlargest) -> Tuple[Series, Series]:
-        up_regulated = self[self > 0]
-        up_regulated = up_regulated[nlargest(up_regulated, limit).index].nlargest(limit)
-        down_regulated = self[self < 0]
-        down_regulated = down_regulated[nlargest(-down_regulated, limit).index].nsmallest(limit)
+        up = self > 0
+        up_regulated = self[up]
+        down_regulated = self[~up & (self < 0)]
+        if nlargest == Series.nlargest:
+
+            # x = s[s != 0].sort_values()
+            # x.head(500)
+            # x.tail(500)
+            # 1.8 ms
+
+            # chosen solution: 1.16 ms
+            up_regulated = up_regulated.nlargest(limit)
+            down_regulated = down_regulated.nsmallest(limit)
+        else:
+            # for log fold-change transformation where custom nlargest is passed
+            up_regulated = up_regulated[nlargest(up_regulated, limit).index].nlargest(limit)
+            down_regulated = down_regulated[nlargest(-down_regulated, limit).index].nsmallest(limit)
         return down_regulated, up_regulated
+
+    def __hash__(self):
+        return hash_series(self)
 
 
 class ScoringData:
@@ -30,7 +49,8 @@ class ScoringData:
             self.ranks = concat([self.up, self.down]).rank(ascending=False)
         else:
             self.ranks = signature.rank(ascending=False)
-        self._hashable = tuple(tuple(component.items()) for component in [self.up, self.down, self.ranks])
+
+        self._hashable = (hash_series(self.up), hash_series(self.down))
 
     @property
     def genes(self) -> set:

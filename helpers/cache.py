@@ -15,7 +15,27 @@ def deep_hash(item):
     return hash(item)
 
 
+def hash_series(series):
+    """Fast series hash"""
+
+    # hash(series.to_string())
+    # 112 ms
+
+    # hash(tuple(series.items()))
+    # 2.24 ms
+
+    # hash((tuple(series.values), tuple(series.index.values)))
+    # 1.77 ms
+
+    # chosen solution: 82.3 µs
+    return hash((
+        hash(series.index.values.data.tobytes()),
+        hash(series.values.data.tobytes()),
+    ))
+
+
 def power_hash(obj):
+    """Powerful (will hash almost everything)"""
     hashable = copy(obj)
     if isinstance(hashable, dict):
         hashable = hash(tuple(
@@ -42,24 +62,41 @@ def power_hash(obj):
 verbose = 0
 
 
-def cache_decorator(function, ignore_first=False):
+def cache_generator(make_hashable):
 
-    def cached(*args, **kwargs):
-        key_args = args[1:] if ignore_first else args
-        hashable = power_hash((key_args, kwargs))
-        if not hasattr(function, '__cache__'):
-            function.__cache__ = {}
-        if hashable not in function.__cache__:
-            if verbose > 1:
-                print(f'Adding to cache; key: {hashable}')
-            function.__cache__[hashable] = function(*args, **kwargs)
-        elif verbose > 1:
-            print(f'Reusing cache; key: {hashable}')
-        return function.__cache__[hashable]
+    def cache_decorator_closure(function):
 
-    cached.original_function = function
+        def cached(*args, **kwargs):
+            hashable = make_hashable(args, kwargs)
+            if not hasattr(function, '__cache__'):
+                function.__cache__ = {}
+            if hashable not in function.__cache__:
+                if verbose > 1:
+                    print(f'Adding to cache; key: {hashable}')
+                function.__cache__[hashable] = function(*args, **kwargs)
+            elif verbose > 1:
+                print(f'Reusing cache; key: {hashable}')
+            return function.__cache__[hashable]
 
-    return cached
+        cached.original_function = function
+
+        return cached
+
+    return cache_decorator_closure
+
+
+cache_decorator = cache_generator(lambda args, kwargs: power_hash((args, kwargs)))
+
+
+def series_method_args_to_hashable(args, kwargs):
+    return (
+        hash_series(args[0]),   # series is assumed to be the first
+        args[1:],
+        tuple(kwargs.items())
+    )
+
+
+fast_series_cache_decorator = cache_generator(series_method_args_to_hashable)
 
 
 def cached_property(function):

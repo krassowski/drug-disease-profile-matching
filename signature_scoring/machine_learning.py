@@ -32,7 +32,6 @@ class AssociationsPreparation:
         self.all_controls = dcm.from_ids(controls_ids, limit_to_one=True).reindex(encoded_census_genes)
         self.get_disease_expression = get_disease_expression
 
-    # TODO: might need re-writing after change of get_differential (no longer ignores self by default; see ignore_first)
     @cache_decorator
     def get_differential(self, cancer_type, metric, limit_to_census, only_paired):
 

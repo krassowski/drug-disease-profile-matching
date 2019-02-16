@@ -2,6 +2,7 @@ from pandas import Series
 from pytest import approx
 
 from signature_scoring.models import Profile
+from helpers.cache import hash_series
 from signature_scoring.models import Signature
 from signature_scoring.scoring_functions.generic_scorers import score_spearman
 
@@ -31,6 +32,16 @@ def test_split():
     down, up = Signature(disease).split(10)
     assert list(down.index) == ['TP53', 'T']
     assert list(up.index) == ['BRCA1', 'B']
+
+
+def test_hash():
+    # identical objects have same hash
+    assert hash_series(drug_1) == hash_series(drug_1)
+    # different values make different hashes
+    assert hash_series(drug_1) != hash_series(drug_2)
+    # different indexes make different hashes
+    drug_1_reindexed = drug_1.reindex(['B', 'BRCA1', 'TP53', 'T'])
+    assert hash_series(drug_1) != hash_series(drug_1_reindexed)
 
 
 def test_profile_split():
