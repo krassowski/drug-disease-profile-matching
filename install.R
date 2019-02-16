@@ -18,3 +18,7 @@ BiocManager::install("TCGAbiolinks", version = "3.8")
 # gsva.R
 install.packages("pbapply")
 install.packages("pbmcapply")
+
+# ggplot2 extensions
+install.packages('ggbeeswarm')
+install.packages('ggalluvial')
