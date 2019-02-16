@@ -5,6 +5,7 @@ from signature_scoring.models import Profile
 from helpers.cache import hash_series
 from signature_scoring.models import Signature
 from signature_scoring.scoring_functions.generic_scorers import score_spearman
+import signature_scoring.scoring_functions.connectivity_score as connectivity
 
 
 disease = Series({'BRCA1': 10, 'B': 1, 'T': -1, 'TP53': -10})
@@ -60,3 +61,8 @@ def test_spearmanr():
 
     assert score_spearman(disease_profile, drug_profile) == approx(2)
     assert score_spearman(disease_profile, disease_profile) == approx(-2)
+
+
+def test_cramer():
+    assert connectivity.cramér_von_mises(disease, drug_1) == 50
+    assert connectivity.cramér_von_mises(disease, disease) == 0

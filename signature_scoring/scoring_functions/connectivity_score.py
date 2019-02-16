@@ -1,4 +1,5 @@
-from numpy import sign
+from numpy import sign, square
+from pandas import Series
 
 from helpers.inline import inline, compile_with_inline, inline_if_else
 
@@ -45,15 +46,24 @@ def summation(ranks_disease, ranks_compound):
     return best
 
 
-def cramér_von_mises(ranks_disease, ranks_compound):
+def cramér_von_mises(ranks_disease, ranks_compound: Series):
 
     n = len(ranks_disease)
     t = len(ranks_compound)
 
-    return sum(
-        (j / t - ranks_disease[gene] / n) ** 2
-        for gene, j in ranks_compound.items()
-    )
+    # benchmarked on real data
+
+    # naive approach: 229 ms
+    # return sum(
+    #     (j / t - ranks_disease[gene] / n) ** 2
+    #     for gene, j in ranks_compound.items()
+    # )
+
+    # vectorized: 2.5 ms
+    # return ((ranks_compound / t - ranks_disease[ranks_compound.index] / n) ** 2).sum()
+
+    # vectorized + numpy: 2.26 ms
+    return square(ranks_compound / t - ranks_disease[ranks_compound.index] / n).sum()
 
 
 def kolmogorov_smirnov_plot(ranks_disease, ranks_compound):
