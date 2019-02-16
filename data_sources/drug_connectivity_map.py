@@ -1,5 +1,7 @@
 from functools import lru_cache
 import warnings
+from typing import List, Set
+from warnings import warn
 
 from pandas import read_table, DataFrame, Series, concat
 from tqdm import tqdm
@@ -10,6 +12,7 @@ from data_sources.data_source import DataSource
 from h5py import File
 from h5py.h5py_warnings import H5pyDeprecationWarning
 
+from helpers import first
 from helpers.cache import cached_property
 
 
@@ -39,6 +42,19 @@ class DrugConnectivityMap(DataSource):
     def metadata_for_perturbation(self, substance: str, pert_id=False):
         sig_info = self.sig_info
         return sig_info[sig_info['pert_id' if pert_id else 'pert_iname'] == substance]
+
+    def all_signatures(self):
+        return self.sig_info.sig_id
+
+    def all_signatures_except(self, substances: Set[str]):
+        substance = first(substances)
+        if '-' in substance and ':' in substance and 'H' in substance:
+            warn(
+                'This looks a bit like a signature, not a substance. '
+                'Are you sure that you passed substances?'
+            )
+        sig_info = self.sig_info
+        return sig_info[~sig_info['pert_iname'].isin(substances)].sig_id
 
     def cell_for_perturbations(self, substances):
         all_cells = []
@@ -161,7 +177,10 @@ class DrugConnectivityMap(DataSource):
             #    logging.log(f'No signatures id for substance {substance}')
         return chosen_signatures
 
-    def from_perturbations(self, substances, synonyms_source=None, exemplar_only=True, cell_id=None, limit_to_one=False, pert_id=False):
+    def from_perturbations(
+        self, substances, synonyms_source=None, exemplar_only=True,
+        cell_id=None, limit_to_one=False, pert_id=False
+    ):
         chosen_signatures = self.ids_for_perturbations(
             substances, synonyms_source=synonyms_source,
             exemplar_only=exemplar_only, limit_to_one=limit_to_one, cell_id=cell_id,
