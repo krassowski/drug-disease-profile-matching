@@ -11,11 +11,11 @@ def score_spearman(disease_profile: Profile, compound_profile: Profile):
     down_ranks = compound_profile.top.down.index
     up_ranks = compound_profile.top.up.index
 
-    corresponding_ranks = [disease_profile.top.ranks[gene] for gene in up_ranks]
+    corresponding_ranks = disease_profile.top.ranks[up_ranks]
     signature_ranks = compound_profile.top.up.rank()
     s_up = spearmanr(signature_ranks, corresponding_ranks).correlation
 
-    corresponding_ranks = [disease_profile.top.ranks[gene] for gene in down_ranks]
+    corresponding_ranks = disease_profile.top.ranks[down_ranks]
     signature_ranks = compound_profile.top.down.rank()
     s_dn = spearmanr(signature_ranks, corresponding_ranks).correlation
 
@@ -28,11 +28,11 @@ def score_spearman_max(disease_profile: Profile, compound_profile: Profile):
     down_ranks = compound_profile.top.down.index
     up_ranks = compound_profile.top.up.index
 
-    corresponding_ranks = [disease_profile.top.ranks[gene] for gene in up_ranks]
+    corresponding_ranks = disease_profile.top.ranks[up_ranks]
     signature_ranks = compound_profile.top.up.rank()
     s_up = spearmanr(signature_ranks, corresponding_ranks).correlation
 
-    corresponding_ranks = [disease_profile.top.ranks[gene] for gene in down_ranks]
+    corresponding_ranks = disease_profile.top.ranks[down_ranks]
     signature_ranks = compound_profile.top.down.rank()
     s_dn = spearmanr(signature_ranks, corresponding_ranks).correlation
 
@@ -73,11 +73,7 @@ def x_sum(disease_profile: Profile, compound_profile: Profile):
         disease_profile.top, compound_profile.top
     )
 
-    return (
-        sum(changed_by_compound.loc[gene] for gene in x_down_in_disease)
-        -
-        sum(changed_by_compound.loc[gene] for gene in x_up_in_disease)
-    )
+    return changed_by_compound[x_down_in_disease].sum() - changed_by_compound[x_up_in_disease].sum()
 
 
 @scoring_function
@@ -88,8 +84,8 @@ def x_sum_max(disease_profile: Profile, compound_profile: Profile):
     )
 
     return max([
-        sum(changed_by_compound.loc[gene] for gene in x_down_in_disease),
-        sum(changed_by_compound.loc[gene] for gene in x_up_in_disease)
+        changed_by_compound[x_down_in_disease].sum(),
+        - changed_by_compound[x_up_in_disease].sum()
     ])
 
 
@@ -103,9 +99,8 @@ def x_product(disease_profile: Profile, compound_profile: Profile):
     disease = disease_profile.top
 
     return (
-        sum(changed_by_compound.loc[gene] * (-disease.down.loc[gene]) for gene in x_down_in_disease)
-        -
-        sum(changed_by_compound.loc[gene] * disease.up.loc[gene] for gene in x_up_in_disease)
+        - (changed_by_compound[x_down_in_disease] * disease.down[x_down_in_disease]).sum()
+        - (changed_by_compound[x_up_in_disease] * disease.up[x_up_in_disease]).sum()
     )
 
 
@@ -119,6 +114,6 @@ def x_product_max(disease_profile: Profile, compound_profile: Profile):
     disease = disease_profile.top
 
     return max([
-        sum(changed_by_compound.loc[gene] * (-disease.down.loc[gene]) for gene in x_down_in_disease),
-        -sum(changed_by_compound.loc[gene] * disease.up.loc[gene] for gene in x_up_in_disease)
+        - (changed_by_compound[x_down_in_disease] * disease.down[x_down_in_disease]).sum(),
+        - (changed_by_compound[x_up_in_disease] * disease.up[x_up_in_disease]).sum()
     ])
