@@ -8,23 +8,30 @@ from . import scoring_function
 
 
 def kolmogorov_smirnov(ranks_disease, ranks_compound):
+    """See:
 
-    a_list = []
-    b_list = []
+    https://portals.broadinstitute.org/cmap/help_topics_linkified.jsp#how%20connectivity%20score%20is%20calculated
+    for reference
 
-    n = len(ranks_disease)
-    t = len(ranks_compound)
+    Possibly more readable version before vectorization:
+        a_list = []
+        b_list = []
 
-    for gene, j in ranks_compound.items():
-        z = ranks_disease[gene] / n
-        a_list.append((j + 1) / t - z)
-        b_list.append(z - j / t)
+        n = len(ranks_disease)
+        t = len(ranks_compound)
 
-    a = max(a_list)
-    b = max(b_list)
+        for gene, j in ranks_compound.items():
+            z = ranks_disease[gene] / n
+            a_list.append((j + 1) / t - z)
+            b_list.append(z - j / t)
 
+        a = max(a_list)
+        b = max(b_list)
+    """
+    z = ranks_disease[ranks_compound.index] / len(ranks_disease)
+    a = (((ranks_compound + 1) / len(ranks_compound)) - z).max()
+    b = (z - (ranks_compound / len(ranks_compound))).max()
     # assert (-1 <= a <= 1) and (-1 <= b <= 1)
-
     return a if a > b else -b
 
 
