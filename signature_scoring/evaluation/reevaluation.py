@@ -27,20 +27,31 @@ def reevaluate(scores_dict_by_cell, scoring_func: ScoringFunction, subtypes_top=
     return data
 
 
-def extract_scores_from_result(result: Series) -> DataFrame:
+def extract_scores_from_result(result: Series, scores_as_series=True) -> DataFrame:
     # TODO: support scoring functions with no cell grouping
+
+    if scores_as_series:
+        def row_details(scores: Series) -> dict:
+            yield {'score': scores}
+    else:
+        def row_details(scores: Series) -> dict:
+            for row in scores.reset_index().itertuples():
+                yield row._asdict()
+
     data = []
 
     for func, scores in result.iteritems():
         for cell_id, cell_scores in scores.__dict__.items():
             # group: indications / contra / controls
             for group, score_series in cell_scores.__dict__.items():
-                data.append({
-                    'func': func,
-                    'cell_id': cell_id,
-                    'group': group,
-                    'score': score_series
-                })
+
+                for row in row_details(score_series):
+                    data.append({
+                        'func': func,
+                        'cell_id': cell_id,
+                        'group': group,
+                        **row
+                    })
 
     return DataFrame(data)
 
