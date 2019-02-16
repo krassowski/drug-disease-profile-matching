@@ -28,7 +28,11 @@ gsva_tmp_dir = create_tmp_dir('gsva')
 vanilla_R = ['R', '--vanilla', '--quiet']
 
 
-def gsva(expression: Union[ExpressionWithControls, Profile], gene_sets_path: str, method: str = 'gsva', single_sample=False, permutations=1000, mx_diff=True, cores=1, _cache=True, limit_to_gene_sets=False, verbose=False):
+def gsva(
+    expression: Union[ExpressionWithControls, Profile], gene_sets_path: str, method: str = 'gsva',
+    single_sample=False, permutations=1000, mx_diff=True, cores=1, _cache=True, limit_to_gene_sets=False,
+    verbose=False
+):
     """
     Excerpt from GSVA documentation:
         An important argument of the gsva() function is the flag mx.diff which is set to TRUE by default.
@@ -97,8 +101,11 @@ def gsva(expression: Union[ExpressionWithControls, Profile], gene_sets_path: str
         process = Popen(vanilla_R, stdin=PIPE, stdout=PIPE, stderr=PIPE)
         r = process._stdin_write(script.encode())
         if verbose:
-            from thirdparty import parallel_output
-            parallel_output(process)
+            from helpers.streams import handle_streams
+            from signature_scoring.evaluation import display
+
+            handlers = {'out': display, 'err': warn}
+            handle_streams(process, handlers)
         else:
             process.wait()
         result = read_csv(f_result.name, index_col=0)
