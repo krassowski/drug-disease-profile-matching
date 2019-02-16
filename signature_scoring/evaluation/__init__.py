@@ -145,13 +145,27 @@ def evaluation_summary(
 
     indications_over_controls = rescore(expected={'indications': 1, 'controls': 0})
     indications_over_contraindications = rescore(expected={'indications': 1, 'contraindications': 0})
-    indications_over_controls_and_contra = rescore(expected={'indications': 1, 'contraindications': 0, 'controls': 0})
+    indications_over_controls_and_contra_binary = rescore(expected={'indications': 1, 'contraindications': 0, 'controls': 0})
+
+    indications_over_controls_and_contra = aggregated_scores_df.assign(
+        group=aggregated_scores_df.group.map({
+            'indications': 'indications',
+            'controls': 'non-indications',
+            'contraindications': 'non-indications'
+        }),
+        expected_score=aggregated_scores_df.group.map({
+            'indications': 'indications',
+            'controls': 'non-indications',
+            'contraindications': 'non-indications'
+        }),
+    )
 
     scores = ProcessedScores(
         vector_overall=vector,
+        vector_indications_over_non_indications=scores_vector(indications_over_controls_and_contra),
         vector_contraindications=scores_vector(aggregated_scores_df, limit_to=['indications', 'contraindications'], rescale=False),
         vector_controls=scores_vector(aggregated_scores_df, limit_to=['indications', 'controls'], rescale=False),
-        vector_overall_binary=scores_vector(indications_over_controls_and_contra, rescale=False),
+        vector_overall_binary=scores_vector(indications_over_controls_and_contra_binary, rescale=False),
         vector_contraindications_binary=scores_vector(indications_over_contraindications, rescale=False),
         vector_controls_binary=scores_vector(indications_over_controls, rescale=False),
         top=top,

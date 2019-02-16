@@ -21,11 +21,11 @@ def recall(true_positives, all_positives):
     return len(true_positives) / len(all_positives)
 
 
-def generalized_roc_auc_score(result):
+def generalized_roc_auc_score(result, **kwargs):
     if len(set(result.expected)) < 2:
         return numpy.nan
 
-    return roc_auc_score(result.expected, result.observed.tolist())
+    return roc_auc_score(result.expected, result.observed.tolist(), **kwargs)
 
 
 def fisher_method(pvalues):

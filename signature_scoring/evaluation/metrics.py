@@ -263,3 +263,17 @@ def normalized_means_difference(scores: ProcessedScores):
 @controls_metric()
 def normalized_means_difference(scores: ProcessedScores):
     return calc.normalized_means_difference(scores.indications, scores.controls)
+
+
+# metrics from Cheng 2014
+
+@indications_metric(name='AUC0.1')
+def partial_retrieval_auc_01(scores: ProcessedScores):
+    """partial retrieval area under the ROC curve (AUC0.1) at false positive rate 0.1"""
+    return calc.generalized_roc_auc_score(scores.vector_indications_over_non_indications, max_fpr=0.1)
+
+
+@indications_metric(name='AUC0.01')
+def partial_retrieval_auc_001(scores: ProcessedScores):
+    """partial retrieval area under the ROC curve (AUC0.01) at false positive rate 0.01"""
+    return calc.generalized_roc_auc_score(scores.vector_indications_over_non_indications, max_fpr=0.01)

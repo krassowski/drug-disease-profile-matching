@@ -51,6 +51,8 @@ class ProcessedScores:
     vector_controls: ScoresVector
     vector_contraindications: ScoresVector
 
+    vector_indications_over_non_indications: ScoresVector
+
     vector_overall_binary: ScoresVector
     vector_controls_binary: ScoresVector
     vector_contraindications_binary: ScoresVector
