@@ -1,5 +1,6 @@
 from pandas import concat
 from scipy.stats import spearmanr
+from scipy import spatial
 
 from ..models import Profile, ScoringData
 from . import scoring_function
@@ -102,6 +103,25 @@ def x_product(disease_profile: Profile, compound_profile: Profile):
         - (changed_by_compound[x_down_in_disease] * disease.down[x_down_in_disease]).sum()
         - (changed_by_compound[x_up_in_disease] * disease.up[x_up_in_disease]).sum()
     )
+
+
+@scoring_function
+def x_cos(disease_profile: Profile, compound_profile: Profile):
+    changed_by_compound, x_down_in_disease, x_up_in_disease = changed_subsets(
+        disease_profile.top, compound_profile.top
+    )
+
+    full_disease = concat([disease_profile.top.up, disease_profile.top.down])
+    full_compound = concat([compound_profile.top.up, compound_profile.top.down])
+
+    changed_in_disease = set(full_disease.index)
+
+    x_set = changed_in_disease.intersection(changed_by_compound.index)
+
+    disease = full_disease[full_disease.index[full_disease.index.isin(x_set)]]
+    drug = full_compound.loc[disease.index]
+
+    return spatial.distance.cosine(drug.values, disease.values)
 
 
 @scoring_function
