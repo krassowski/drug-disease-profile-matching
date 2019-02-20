@@ -29,3 +29,5 @@ install.packages('ggalluvial')
 
 # why is that not a part of ggplot?
 install.packages('latex2exp')
+
+install.packages('shadowtext')
