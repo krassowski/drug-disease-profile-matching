@@ -13,13 +13,26 @@ def get_indent_level(x):
 
 
 def if_else(match, to_inline, new_source, state):
-    args = eval(match['args'], to_inline)
-    condition, positive, negative = args
+    args = match['args']
+
+    try:
+        args = eval(args, to_inline)
+        condition, positive, negative = args
+        literal = True
+    except NameError:
+        slitted = args.split(',')
+        condition = eval(slitted[0], to_inline)
+        positive, negative = slitted[1:]
+        literal = False
+
     if condition:
         target = positive
     else:
         target = negative
-    new_source.append('    ' + match['new_name'] + ' = ' + repr(target))
+
+    if literal:
+        target = repr(target)
+    new_source.append('    ' + match['new_name'] + ' = ' + target)
 
 
 def inline_if(match, to_inline, new_source, state):
@@ -40,14 +53,17 @@ def inline_assignment(match, to_inline, new_source, state):
     t = '    ' * state['level']
 
     if isinstance(target, FunctionType):
-        s = getsource(target).split('\n')
-
-        new_source.append(t + '# ' + target.__name__)
-        new_source.append(t + s[0].replace(target.__name__, new_name))
-        if not s[-1]:   # trim empty line at the end
-            s.pop(-1)
-        for l in s[1:]:
-            new_source.append(t + l)
+        target = target.__name__
+    # Function in-lining disabled for now as it gets too complicated
+    #    s = getsource(target).split('\n')
+    #    new_source.append(t + '# ' + target.__name__)
+    #    new_source.append(t + s[0].replace(target.__name__, new_name))
+    #    if not s[-1]:   # trim empty line at the end
+    #        s.pop(-1)
+    #    for l in s[1:]:
+    #        new_source.append(t + l)
+    s = t + new_name + ' = ' + str(target)
+    new_source.append(s)
 
 
 def inline_return(match, to_inline, new_source, state):
