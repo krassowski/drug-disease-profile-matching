@@ -129,7 +129,8 @@ class SignatureProcessor:
 
     def score_signatures(
         self, scoring_func, disease_signature, limit=500, gene_subset=None,
-        scale=False, gene_selection=Series.nlargest, force_multiprocess_all=False
+        scale=False, gene_selection=Series.nlargest, force_multiprocess_all=False,
+        limit_genes=True
     ):
         # scaling will be performed in transform_signature
         self.scale = scale
@@ -148,6 +149,9 @@ class SignatureProcessor:
         else:
             disease_profile = disease_signature
             selected_genes = disease_profile.index
+
+        if not limit_genes:
+            selected_genes = common_genes
 
         self.warn_if_few_genes_selected(selected_genes, limit)
 
@@ -187,5 +191,5 @@ class SignatureProcessor:
         ]
 
         if scoring_func.grouping:
-            return Scores.from_grouped_signatures(scores)
-        return Scores(scores)
+            return self.scores_type.from_grouped_signatures(scores)
+        return self.scores_type(scores)
