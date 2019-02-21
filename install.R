@@ -26,8 +26,9 @@ install.packages("pbmcapply")
 # ggplot2 extensions
 install.packages('ggbeeswarm')
 install.packages('ggalluvial')
+install.packages('ggpubr')
+install.packages('shadowtext')
+install.packages('survminer')
 
 # why is that not a part of ggplot?
 install.packages('latex2exp')
-
-install.packages('shadowtext')
