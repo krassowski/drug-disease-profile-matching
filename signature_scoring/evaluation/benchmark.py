@@ -10,7 +10,7 @@ from . import evaluate
 def benchmark(
     funcs, query_signature, indications_signatures, contraindications_signatures=None,
     control_signatures=None, per_test_progress=False, query_expression: ExpressionWithControls = None,
-    quiet=False, progress=True, **kwargs
+    quiet=False, progress=True, unassigned_signatures=None, **kwargs
 ):
     data = []
     is_first_run = True
@@ -26,6 +26,7 @@ def benchmark(
         result = evaluate(
             func, query, indications_signatures, contraindications_signatures,
             control_signatures=control_signatures if func.is_applicable_to_control_signatures else None,
+            unassigned_signatures=unassigned_signatures,
             progress=per_test_progress, reset_warnings=is_first_run,
             **kwargs
         )

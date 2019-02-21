@@ -60,4 +60,4 @@ class ProcessedScores:
     indications: Series
     contraindications: Series
     controls: Series
-
+    unassigned: Series

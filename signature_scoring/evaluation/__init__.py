@@ -28,6 +28,7 @@ test_warnings = WarningManager()
 groups_label_value_map = {
     'indications': 1,
     'controls': 0,
+    'unassigned': numpy.nan,
     'contraindications': -1
 }
 
@@ -70,6 +71,17 @@ def select_top_substance(vector: ScoresVector, how) -> Series:
     return top_scoring
 
 
+groups_divided_as_with_indications_or_non_indications = {
+    group: 'indications' if group == 'indications' else 'non-indications'
+    for group in groups_label_value_map
+}
+
+group_scores_for_indications_vs_non_indications = {
+    group: 1 if group == 'indications' else 0
+    for group in groups_label_value_map
+}
+
+
 def evaluation_summary(
     scores_dict: Dict[Group, Union[Scores, AggregatedScores]], top: str, aggregate: str, scores_vector=ScoresVector,
     transform_scores=None, subtypes_top=None, subtypes_dicts=None
@@ -84,7 +96,12 @@ def evaluation_summary(
     )
     aggregated_scores_df['group'] = pandas.Categorical(aggregated_scores_df['group'])
 
-    vector = scores_vector(aggregated_scores_df)
+    vector = scores_vector(
+        aggregated_scores_df,
+        # substances of unknown status ('unassigned') have no expected score,
+        # and as such they are being left out:
+        limit_to=['indications', 'controls', 'contraindications']
+    )
 
     if subtypes_top:
 
@@ -115,9 +132,10 @@ def evaluation_summary(
     else:
         top_scoring = select_top_substance(vector, how=top)
 
-    scores_indications, scores_controls, scores_contraindications = (
+    scores_indications, scores_controls, scores_unassigned, scores_contraindications = (
         aggregated_scores_by_group_label['indications'],
         aggregated_scores_by_group_label['controls'],
+        aggregated_scores_by_group_label['unassigned'],
         aggregated_scores_by_group_label['contraindications']
     )
 
@@ -143,31 +161,24 @@ def evaluation_summary(
         df_subset['expected_score'] = df_subset.group.map(expected.get)
         return df_subset
 
-    indications_over_controls = rescore(expected={'indications': 1, 'controls': 0})
-    indications_over_contraindications = rescore(expected={'indications': 1, 'contraindications': 0})
-    indications_over_controls_and_contra_binary = rescore(expected={'indications': 1, 'contraindications': 0, 'controls': 0})
+    # re-scored into binary value of 0 or 1, depending on group assignment
+    bin_indications_over_controls = rescore(expected={'indications': 1, 'controls': 0})
+    bin_indications_over_contraindications = rescore(expected={'indications': 1, 'contraindications': 0})
+    bin_indications_over_non_indications = rescore(expected=group_scores_for_indications_vs_non_indications)
 
-    indications_over_controls_and_contra = aggregated_scores_df.assign(
-        group=aggregated_scores_df.group.map({
-            'indications': 'indications',
-            'controls': 'non-indications',
-            'contraindications': 'non-indications'
-        }),
-        expected_score=aggregated_scores_df.group.map({
-            'indications': 'indications',
-            'controls': 'non-indications',
-            'contraindications': 'non-indications'
-        }),
+    indications_over_non_indications = aggregated_scores_df.assign(
+        group=aggregated_scores_df.group.map(groups_divided_as_with_indications_or_non_indications),
+        expected_score=aggregated_scores_df.group.map(groups_divided_as_with_indications_or_non_indications),
     )
 
     scores = ProcessedScores(
         vector_overall=vector,
-        vector_indications_over_non_indications=scores_vector(indications_over_controls_and_contra),
+        vector_indications_over_non_indications=scores_vector(indications_over_non_indications),
         vector_contraindications=scores_vector(aggregated_scores_df, limit_to=['indications', 'contraindications'], rescale=False),
         vector_controls=scores_vector(aggregated_scores_df, limit_to=['indications', 'controls'], rescale=False),
-        vector_overall_binary=scores_vector(indications_over_controls_and_contra_binary, rescale=False),
-        vector_contraindications_binary=scores_vector(indications_over_contraindications, rescale=False),
-        vector_controls_binary=scores_vector(indications_over_controls, rescale=False),
+        vector_overall_binary=scores_vector(bin_indications_over_non_indications, rescale=False),
+        vector_contraindications_binary=scores_vector(bin_indications_over_contraindications, rescale=False),
+        vector_controls_binary=scores_vector(bin_indications_over_controls, rescale=False),
         top=top,
         **{
             group: aggregated_scores.score
@@ -208,6 +219,7 @@ def calculate_scores(query_signature, signatures_map, scoring_func, fold_changes
     scores_dict = {
         'indications': score(signatures_map['indications']),
         'controls': score_or_empty('control'),
+        'unassigned': score_or_empty('unassigned'),
         'contraindications': score_or_empty('contraindications')
     }
 
@@ -275,7 +287,7 @@ def summarize_across_cell_lines(summarize_test: FunctionType, scores_dict_by_cel
 
 def evaluate(
     scoring_func: ScoringFunction, query_signature, indications_signatures, contraindications_signatures,
-    control_signatures=None, aggregate='mean_per_substance_dose_and_cell', top='rescaled',
+    control_signatures=None, unassigned_signatures=None, aggregate='mean_per_substance_dose_and_cell', top='rescaled',
     cell_lines_ratio=0.9, summary='per_cell_line_combined', fold_changes=False,
     reset_warnings=True, **kwargs
 ):
@@ -290,7 +302,8 @@ def evaluate(
     signatures_map = {
         'indications': indications_signatures,
         'contraindications': contraindications_signatures,
-        'control': control_signatures
+        'control': control_signatures,
+        'unassigned': unassigned_signatures
     }
 
     if control_signatures is not None:

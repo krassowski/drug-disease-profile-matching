@@ -79,6 +79,8 @@ def summarize(
 
     # this bit is used for fold-change benchmark results (see Benefits of additional fold-change...)
     if display_ready_table.index.duplicated().any():
+        from IPython.core.display import display
+        display(display_ready_table)
         display_ready_table = display_ready_table.reset_index().set_index([('meta', 'Fold'), ('Func',)])
 
     show_table(
