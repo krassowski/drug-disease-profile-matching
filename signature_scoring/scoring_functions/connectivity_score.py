@@ -197,19 +197,7 @@ def create_scorer(
     assert ranks_type in {'disease', 'signature'}
 
     """
-    
-    Cheng study:
-    
-    UpInDisease = a set of N up‐regulated features from disease genomic data
-    DownInDisease = a set of N down‐regulated features from disease genomic data
-    KSup = the KS score between UpInDisease and complete compound profile
-    KSdown = the KS score between DownInDisease and complete compound profile
-    IfKSup and KSdown have different signs then Connectivity score = KSup −  KSdown else Connectivity score = 0
-
-    For this study, N is set to 500 in all metrics.
-    """
-    """
-    As per CMap publication and more detailed:
+    As defined in Cheng, 2014 study and based on CMap publication, using the detailed description from:
     https://portals.broadinstitute.org/cmap/help_topics_linkified.jsp#how%20connectivity%20score%20is%20calculated
     """
     compute_statistic = statistic
