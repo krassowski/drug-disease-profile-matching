@@ -194,14 +194,14 @@ def ks_p(scores: ProcessedScores):
     # stochastically *smaller* than y (the CDF of x lies above and hence to the left of that for y),
     # in contrast to t.test or wilcox.test."
     ks = r_ks_test(scores.indications, scores.controls, alternative='less')
-    return ks['p.value'][0]
+    return ks['p.value']
 
 
 @contraindications_metric(objective='minimize', name='KS p-value', combine=calc.fisher_method)
 def ks_p(scores: ProcessedScores):
     # See ks_p controls metric for explanation of alternative='less'
     ks = r_ks_test(scores.indications, scores.contraindications, alternative='less')
-    return ks['p.value'][0]
+    return ks['p.value']
 
 
 # ROC AUC

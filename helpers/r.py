@@ -7,6 +7,7 @@ from rpy2.robjects import pandas2ri
 from rpy2.robjects.pandas2ri import ri2py as r2p
 from rpy2.robjects.pandas2ri import py2ri as p2r
 
+
 pandas2ri.activate()
 
 source = r.source
@@ -55,9 +56,15 @@ def data_frame_from_matrix(matrix):
     )
 
 
+def one_or_all(x):
+    if len(x) == 1:
+        return x[0]
+    return x
+
+
 def r_ks_test(x, y, **kwargs):
     if len(x) < 2 or len(y) < 2:
-        return {'p.value': [1]}
+        return {'p.value': 1}
     from pandas import Series
     try:
         result = r['ks.test'](p2r(Series(x)), p2r(Series(y)), **kwargs)
@@ -66,4 +73,7 @@ def r_ks_test(x, y, **kwargs):
         print(y)
         print(kwargs)
         raise
-    return dict(result.items())
+    return {
+        key: one_or_all(value)
+        for key, value in result.items()
+    }
