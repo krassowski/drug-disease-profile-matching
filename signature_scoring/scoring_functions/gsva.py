@@ -4,8 +4,10 @@ from warnings import warn
 from tempfile import NamedTemporaryFile
 from subprocess import Popen, PIPE
 
+from numpy import nan
 from pandas import read_csv
 from pandas import DataFrame, concat, Series
+from pandas.errors import EmptyDataError
 from rpy2.robjects import r
 from rpy2.robjects.packages import importr
 
@@ -108,7 +110,10 @@ def gsva(
             handle_streams(process, handlers)
         else:
             process.wait()
-        result = read_csv(f_result.name, index_col=0)
+        try:
+            result = read_csv(f_result.name, index_col=0)
+        except EmptyDataError:
+            result = DataFrame()
 
     if _cache:
         GSVA_CACHE[key] = result
@@ -141,12 +146,21 @@ def create_gsva_scorer(
         if not custom_multiprocessing:
             multiprocess_cache_manager.respawn_cache_if_needed()
 
-        disease_gene_sets = gsva(disease, gene_sets_path=gene_sets_file.name, method=method, single_sample=single_sample, permutations=permutations, mx_diff=mx_diff, cores=cores)
+        disease_gene_sets = gsva(
+            disease, gene_sets_path=gene_sets_file.name, method=method, single_sample=single_sample,
+            permutations=permutations, mx_diff=mx_diff, cores=cores
+        )
 
         disease_gene_sets.drop(disease_gene_sets[disease_gene_sets['fdr_q-val'] > q_value_cutoff].index, inplace=True)
 
         assert len(disease_gene_sets.index)
-        signature_gene_sets = gsva(compound, gene_sets_path=gene_sets_file.name, method=method, single_sample=single_sample, permutations=permutations, mx_diff=mx_diff, _cache=False, cores=cores, limit_to_gene_sets=list(disease_gene_sets.index))
+        signature_gene_sets = gsva(
+            compound, gene_sets_path=gene_sets_file.name, method=method, single_sample=single_sample,
+            permutations=permutations, mx_diff=mx_diff, _cache=False, cores=cores,
+            limit_to_gene_sets=list(disease_gene_sets.index)
+        )
+        if signature_gene_sets.empty:
+            return nan
 
         joined = combine_gsea_results(disease_gene_sets, signature_gene_sets, na_action)
         assert not (set(signature_gene_sets.index) - set(disease_gene_sets.index))
