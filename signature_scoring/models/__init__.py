@@ -6,6 +6,7 @@ from pandas import Series, concat, Index
 
 from data_frames import AugmentedSeries, AugmentedDataFrame
 from helpers.cache import hash_series, fast_series_cache_decorator
+from helpers.mathtools import split_to_pos_and_neg
 
 
 class Signature(AugmentedSeries):
@@ -13,9 +14,16 @@ class Signature(AugmentedSeries):
     # cache may explode memory... but should be of great benefit to benchmarking / permutations
     @fast_series_cache_decorator
     def split(self, limit: int, nlargest=Series.nlargest) -> Tuple[Series, Series]:
-        up = self > 0
-        up_regulated = self[up]
-        down_regulated = self[~up & (self < 0)]
+        # up = self > 0
+        # up_regulated = self[up]
+        # down_regulated = self[~up & (self < 0)]
+        # 1.43 ms ± 49.9 µs
+
+        # chosen solution: 521 µs ± 12.8 µs
+        p, n = split_to_pos_and_neg(self.values)
+        up_regulated = self[p]
+        down_regulated = self[n]
+
         if nlargest == Series.nlargest:
 
             # x = s[s != 0].sort_values()

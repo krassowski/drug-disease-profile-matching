@@ -2,6 +2,7 @@ from pandas import Series
 from pytest import approx
 
 from signature_scoring.models import Profile
+from helpers.mathtools import split_to_pos_and_neg
 from helpers.cache import hash_series
 from signature_scoring.models import Signature
 from signature_scoring.scoring_functions.generic_scorers import score_spearman
@@ -29,10 +30,31 @@ def test_profile_ranks():
     #assert disease_profile.full.ranks.to_dict() == disease_ranks
 
 
+def test_zero_split():
+
+    pos, neg = split_to_pos_and_neg(disease.values)
+    assert list(pos) == [0, 1]
+    assert list(neg) == [2, 3]
+
+    pos, neg = split_to_pos_and_neg(Series({'A': 1, 'B': 0, 'C': 1}).values)
+    assert list(pos) == [0, 2]
+    assert list(neg) == []
+
+
 def test_split():
     down, up = Signature(disease).split(10)
     assert list(down.index) == ['TP53', 'T']
     assert list(up.index) == ['BRCA1', 'B']
+
+    down, up = Signature(Series(
+        dict(zip(
+            'ABCDEFGHI',
+            range(1, 10)
+        ))
+    )).split(5)
+
+    assert list(down.index) == []
+    assert list(up.index) == ['I', 'H', 'G', 'F', 'E']
 
 
 def test_hash():
