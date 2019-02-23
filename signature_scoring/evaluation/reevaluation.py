@@ -1,5 +1,6 @@
 from collections import defaultdict
 from functools import partial
+from types import SimpleNamespace
 from warnings import warn
 
 from numpy import isclose
@@ -27,8 +28,10 @@ def reevaluate(scores_dict_by_cell, scoring_func: ScoringFunction, subtypes_top=
     return data
 
 
-def extract_scores_from_result(result: Series, scores_as_series=True) -> DataFrame:
-    # TODO: support scoring functions with no cell grouping
+def extract_scores_from_result(
+    result: Series,
+    scores_as_series=True, are_grouped_by_cell=True
+) -> DataFrame:
 
     if scores_as_series:
         def row_details(scores: Series) -> dict:
@@ -38,19 +41,27 @@ def extract_scores_from_result(result: Series, scores_as_series=True) -> DataFra
             for row in scores.reset_index().itertuples():
                 yield row._asdict()
 
+    if are_grouped_by_cell:
+        def iter_groups(scores: SimpleNamespace):
+            for cell_id, cell_scores in scores.__dict__.items():
+                yield {'cell_id': cell_id}, cell_scores
+    else:
+        def iter_groups(scores: SimpleNamespace):
+            yield {}, scores
+
     data = []
 
-    for func, scores in result.iteritems():
-        for cell_id, cell_scores in scores.__dict__.items():
+    for func, func_scores in result.iteritems():
+        for group_metadata, group_scores in iter_groups(func_scores):
             # group: indications / contra / controls
-            for group, score_series in cell_scores.__dict__.items():
+            for group, score_series in group_scores.__dict__.items():
 
                 for row in row_details(score_series):
                     data.append({
                         'func': func,
-                        'cell_id': cell_id,
                         'group': group,
-                        **row
+                        **row,
+                        **group_metadata
                     })
 
     return DataFrame(data)
