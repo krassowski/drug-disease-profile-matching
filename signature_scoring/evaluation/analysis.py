@@ -1,4 +1,4 @@
-from pandas import DataFrame
+from pandas import DataFrame, Series
 from sklearn.metrics import log_loss
 
 from helpers.gui import NeatNamespace
@@ -11,7 +11,7 @@ def ks_distance(a, b):
     return r_ks_test(a, b)['statistic']
 
 
-def cluster_scores(scores, normalize=True, distance=ks_distance):
+def distance_matrix(scores, normalize=True, distance=ks_distance):
     functions = list(scores.func.unique())
     matrix = DataFrame(index=functions, columns=functions)
     for i, func in enumerate(functions):
@@ -84,3 +84,22 @@ def normalize_scores(scores, rescale: bool, by_cell: bool):
         ), axis=1)
 
     return scores
+
+
+def test_rank_diff_indications_vs_non_indications(scores, alternative_indications_are='greater'):
+    assert 'rank' in scores.columns
+    is_indication = (scores.group == 'indications')
+    indications_by_func = scores[is_indication].groupby('func')
+    non_indications_by_func = scores[~is_indication].groupby('func')
+    non_indications_by_func = non_indications_by_func['rank'].apply(list).to_dict()
+    result = indications_by_func['rank'].apply(
+        lambda ranks: r_ks_test(
+            ranks,
+            Series(non_indications_by_func[ranks.name]),
+            alternative=alternative_indications_are
+        )
+    )
+    result = result.reset_index().set_index('func').pivot(columns='level_1')
+    result.columns = result.columns.droplevel()
+    result.drop('data.name', axis=1, inplace=True)
+    return result
