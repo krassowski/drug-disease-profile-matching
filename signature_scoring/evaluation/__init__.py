@@ -288,7 +288,7 @@ def summarize_across_cell_lines(summarize_test: FunctionType, scores_dict_by_cel
 def evaluate(
     scoring_func: ScoringFunction, query_signature, indications_signatures, contraindications_signatures,
     control_signatures=None, unassigned_signatures=None, aggregate='mean_per_substance_dose_and_cell', top='rescaled',
-    cell_lines_ratio=0.9, summary='per_cell_line_combined', fold_changes=False,
+    cell_lines_ratio=0.9, summary='per_cell_line_combined', fold_changes=False, cell_lines=None,
     reset_warnings=True, **kwargs
 ):
     """
@@ -320,18 +320,27 @@ def evaluate(
         if signatures is not None
     }
 
-    if cell_lines_ratio:
+    selected_cells = None
 
+    if cell_lines_ratio:
         selected_cells = select_cells(signatures_map, cell_lines_ratio)
 
         test_warnings.warn_once(
             f'Keeping cell lines with data for at least {cell_lines_ratio * 100:.0f}% '
             f'of substances (and at least one substance per class).'
         )
+
+    if cell_lines:
+        if selected_cells:
+            selected_cells = set(selected_cells).intersection(cell_lines)
+        else:
+            selected_cells = cell_lines
+        test_warnings.warn_once(f'Restricting cell lines to: {cell_lines}')
+
+    if cell_lines_ratio or cell_lines:
         test_warnings.warn_once(
             f'Keeping {len(selected_cells)} distinct cell lines: {selected_cells}'
         )
-
         for name, signatures in signatures_map.items():
             signatures_data = dcm.sig_info[dcm.sig_info.sig_id.isin(signatures.signature_ids)]
             signatures_to_keep = set(signatures_data[signatures_data.cell_id.isin(selected_cells)].sig_id)
