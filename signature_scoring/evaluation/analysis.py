@@ -1,4 +1,6 @@
 from pandas import DataFrame, Series
+from sklearn.cluster import AgglomerativeClustering
+from sklearn.metrics import adjusted_rand_score
 from sklearn.metrics import log_loss
 
 from helpers.gui import NeatNamespace
@@ -11,16 +13,17 @@ def ks_distance(a, b):
     return r_ks_test(a, b)['statistic']
 
 
-def distance_matrix(scores, normalize=True, distance=ks_distance):
+def distance_matrix(scores, normalize=True, distance=ks_distance, condensed=True):
     functions = list(scores.func.unique())
-    matrix = DataFrame(index=functions, columns=functions)
+    matrix = DataFrame(data=0, index=functions, columns=functions)
     for i, func in enumerate(functions):
         for other_func in functions[i+1:]:
             a = scores[scores.func == func]['score']
             b = scores[scores.func == other_func]['score']
             d = distance(a, b)
             matrix.loc[func, other_func] = d
-            matrix.loc[other_func, func] = d
+            if not condensed:
+                matrix.loc[other_func, func] = d
         matrix.loc[func, func] = 0
     if normalize:
         matrix = matrix / matrix.max().max()
@@ -103,3 +106,39 @@ def test_rank_diff_indications_vs_non_indications(scores, alternative_indication
     result.columns = result.columns.droplevel()
     result.drop('data.name', axis=1, inplace=True)
     return result
+
+
+def n_best_scoring(scores, group_by_function, n=3):
+    best_scoring_pos = (
+        group_by_function['rank']
+        .apply(Series.nsmallest, n)
+        .reset_index()
+        .rename({'level_1': 'score_index'}, axis=1)
+    )
+    best_recovered = scores.loc[best_scoring_pos.score_index].set_index('func')
+    return best_recovered
+
+
+def clusters_from_matrix(matrix, n, linkage=None):
+    """If no specific linkage is given, compare results
+    from all implemented ones and check if they agree"""
+    if linkage:
+        linkages = [linkage]
+    else:
+        linkages = ["ward", "complete", "average", "single"]
+
+    clusterings = []
+    for linkage in linkages:
+        clusters = list(
+            AgglomerativeClustering(n_clusters=n, linkage=linkage)
+            .fit_predict(matrix)
+        )
+        clusterings.append(clusters)
+
+    try:
+        assert all(adjusted_rand_score(clusters, c) for c in clusterings)
+    except:
+        print(clusterings)
+
+    clusters = dict(zip(matrix.columns, clusters))
+    return clusters
