@@ -1,9 +1,20 @@
-from numpy import mean, sign, nan
+from numpy import mean, sign, nan, isinf
 from statistics import stdev
 # for population/biased standard deviation use:
 # from numpy import std as stdev
 
 from numba import jit
+from pandas import Series
+
+
+@jit
+def signal_to_noise_vectorized(case: Series, control: Series):
+    case: Series = case.T
+    control = control.T
+    dev_sum = case.std() + control.std()
+    query_signature = (case.mean() - control.mean()) / dev_sum
+    query_signature.loc[isinf(query_signature)] = nan
+    return query_signature.T
 
 
 @jit

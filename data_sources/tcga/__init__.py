@@ -13,7 +13,7 @@ from rpy2.rinterface import RRuntimeError
 from config import DATA_DIR
 from data_sources.data_source import DataSource
 
-from metrics import signal_to_noise
+from metrics import signal_to_noise, signal_to_noise_vectorized
 from models import ExpressionProfile
 from helpers.r import importr, r2p
 
@@ -190,8 +190,14 @@ class ExpressionManager(LayerDataWithSubsets, ExpressionProfile):
         print(f'Metric: {metric.__name__}, groups: {case_}, {control_}')
 
         case, control = self.split(case_, control_, only_paired)
+
         if additional_controls is not None:
-            control = concat([control, additional_controls], axis=1).T.drop_duplicates().T
+            if len(control.columns.difference(additional_controls.columns)):
+                # there are some controls in "control" that are not in additional columns
+                # (additional columns are not a superset, though may overlap)
+                control = concat([control, additional_controls], axis=1).T.drop_duplicates().T
+            else:
+                control = additional_controls
         diff = []
 
         if case.empty or control.empty:
@@ -203,14 +209,15 @@ class ExpressionManager(LayerDataWithSubsets, ExpressionProfile):
             genes = genes & set(limit_to)
         genes = list(genes)
         try:
-            # pool = Pool()
-            # pool.imap(metric, [case.loc[gene], control.loc[gene] for gene in genes])
-            for gene in genes:
-                diff.append(metric(case.loc[gene], control.loc[gene]))
+            if metric is signal_to_noise:
+                query_signature = signal_to_noise_vectorized(case.loc[genes], control.loc[genes])
+            else:
+                for gene in genes:
+                    diff.append(metric(case.loc[gene], control.loc[gene]))
+                query_signature = Series(diff, index=genes)
         except StatisticsError:
-            warn(f'Couldn\'t compute metric: {signal_to_noise} for {case} and {control}')
+            warn(f'Couldn\'t compute metric: {metric} for {case} and {control}')
             return
-        query_signature = Series(diff, index=genes)
         if nans == 'fill_0':
             query_signature = query_signature.fillna(0)
         if index_as_bytes:
