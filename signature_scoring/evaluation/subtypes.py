@@ -10,6 +10,7 @@ from tqdm import tqdm
 
 from data_frames import to_nested_dicts
 from data_sources.drug_connectivity_map import AggregatedScores
+from ..models.with_controls import TCGAExpressionWithControls
 
 from .permutations import compare_against_permutations_group, compare_observations_with_permutations
 from .reevaluation import extract_scores_from_result, extract_single_score, reevaluate
@@ -29,9 +30,10 @@ def subtypes_benchmark(
     else:
         additional_controls = {}
 
-    print(f'Using all controls? {use_all_controls}')
+    print(f'Using all disease controls: {use_all_controls}')
 
     for subtype, samples in samples_by_subtype.items():
+
         type_subset = expression[[samples_mapping(sample) for sample in samples]]
         print(f'Using subset: {subtype} with {len(type_subset.columns)} samples')
         if 'normal' not in type_subset.classes and not use_all_controls:
@@ -45,7 +47,19 @@ def subtypes_benchmark(
             only_paired=False,
             **additional_controls
         )
-        subtypes_results[subtype] = benchmark_function(funcs, differential_subset, *args, **kwargs)
+
+        if use_all_controls:
+            absent_controls = all_controls.columns.difference(type_subset.columns)
+            type_subset = concat([type_subset, all_controls[absent_controls]], axis=1)
+
+        subset_with_controls = TCGAExpressionWithControls(type_subset)
+
+        subtypes_results[subtype] = benchmark_function(
+            funcs,
+            query_signature=differential_subset,
+            query_expression=subset_with_controls,
+            *args, **kwargs
+        )
 
     return subtypes_results
 

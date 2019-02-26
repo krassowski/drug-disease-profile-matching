@@ -21,7 +21,7 @@ def get_subtype_by_sample(expression: ExpressionManager, subtype_by_participant:
     ])
 
     # try to merge by sample
-    merged_by_sample = barcode_participant_sample.merge(subtypes, left_on='sample', right_on='pan.samplesid')
+    merged_by_sample = barcode_participant_sample.merge(subtypes, left_on='sample', right_on='pan_samplesid')
 
     print(f'{len(merged_by_sample)} matched exactly on sample ID')
 
