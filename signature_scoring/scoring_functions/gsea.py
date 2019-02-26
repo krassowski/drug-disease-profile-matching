@@ -93,7 +93,7 @@ def create_gsea_scorer(
     permutation_type='Gene_set', grouping=None,
     custom_multiprocessing=False, verbose=False,
     min_genes=15, max_genes=500, id_type='entrez',
-    genes: Set[str] = None, cache=True
+    genes: Set[str] = None, cache=True, cache_signatures=False
 ):
     """
     na_action: fill_0 or drop
@@ -174,7 +174,7 @@ def create_gsea_scorer(
             signature_gene_sets_up, signature_gene_sets_dn = cached_gsea_run(
                 gsea_app,
                 gsea, gene_sets, compound_expression, class_name='signature',
-                cache=cache
+                cache=cache and cache_signatures
             )
         except GSEAError:
             return None
