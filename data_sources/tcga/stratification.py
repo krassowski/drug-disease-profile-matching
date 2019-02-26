@@ -20,20 +20,31 @@ def get_subtype_by_sample(expression: ExpressionManager, subtype_by_participant:
         for barcode in samples
     ])
 
+    by_participant = True
+
     # try to merge by sample
-    merged_by_sample = barcode_participant_sample.merge(subtypes, left_on='sample', right_on='pan_samplesid')
+    if 'pan_samplesid' in subtypes.columns:
+        merged_by_sample = barcode_participant_sample.merge(subtypes, left_on='sample', right_on='pan_samplesid')
 
-    print(f'{len(merged_by_sample)} matched exactly on sample ID')
+        print(f'{len(merged_by_sample)} matched exactly on sample ID')
 
-    # ignore participants that were merged above
-    merged_participants = set(merged_by_sample.participant_x)
-    remaining_subtypes = subtypes[~subtypes.participant.isin(merged_participants)]
-    remaining_bps = barcode_participant_sample[~barcode_participant_sample.participant.isin(merged_participants)]
+        # ignore participants that were merged above
+        merged_participants = set(merged_by_sample.participant_x)
+        remaining_subtypes = subtypes[~subtypes.participant.isin(merged_participants)]
+        remaining_bps = barcode_participant_sample[~barcode_participant_sample.participant.isin(merged_participants)]
 
-    results = [merged_by_sample]
+        results = [merged_by_sample]
 
-    if len(remaining_bps):
-        print('Not all samples were matched by sample, attempting to match by participant')
+        if len(remaining_bps):
+            print('Not all samples were matched by sample, attempting to match by participant')
+        else:
+            by_participant = False
+    else:
+        results = []
+        remaining_bps = barcode_participant_sample
+        remaining_subtypes = subtypes
+
+    if by_participant:
         merged_by_participant = remaining_bps.merge(remaining_subtypes, on='participant')
         print(f'{len(merged_by_participant)} matched by participant ID')
         results.append(merged_by_participant)
