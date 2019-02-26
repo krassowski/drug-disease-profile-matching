@@ -222,7 +222,13 @@ class SubstancesCollectionWithControls(SubstancesCollection, UserDict):
     @classmethod
     def from_signatures(cls, signatures: SignaturesData):
         data = {}
-        for substance in set(signatures.classes()):
-            signature_ids = signatures.members_of_class(substance)
+        # for substance in set(signatures.classes()):
+        #     signature_ids = signatures.members_of_class(substance)
+        # 1.5 s ± 56.2 ms
+
+        # chosen: 32 ms ± 2.6 ms
+        signatures_by_class = signatures.ordered_classes().reset_index().groupby('pert_iname').index.apply(list)
+        for substance, signature_ids in signatures_by_class.items():
             data[tuple(signature_ids)] = SignaturesWithControls(signatures[signature_ids])
         return cls(data)
+

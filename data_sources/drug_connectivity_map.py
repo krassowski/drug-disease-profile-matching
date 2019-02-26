@@ -35,6 +35,7 @@ class DrugConnectivityMap(DataSource):
             for i, sig_id in enumerate(self.sig_index_vector)
         }
         self.sig_info = read_table(dataset_path + '/GSE92742_Broad_LINCS_sig_info.txt.gz', low_memory=False)
+        self.sig_info_sig_id = self.sig_info.set_index('sig_id')
 
     def signatures_treated_with(self, substance: str, pert_id=False):
         return self.metadata_for_perturbation(substance, pert_id=pert_id).sig_id
@@ -379,6 +380,10 @@ class SignaturesData(MyDataFrame):
 
     def classes(self, class_type='pert_iname'):
         metadata = dcm.sig_info[dcm.sig_info.sig_id.isin(self.columns)]
+        return metadata[class_type]
+
+    def ordered_classes(self, class_type='pert_iname'):
+        metadata = dcm.sig_info_sig_id.loc[self.columns]
         return metadata[class_type]
 
     @property
