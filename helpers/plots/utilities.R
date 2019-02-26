@@ -40,3 +40,8 @@ labels_seq <- function(reference, side, zoom, end_shift=0) {
 subplot <- function(letter) {
     annotate('text', x=-Inf, y=Inf, label=letter, hjust=-1, vjust=1)
 }
+
+
+latex_levels <- function(df, col, output='expression') {
+    sapply(levels(df[,col]), latex2exp::TeX, output)
+}

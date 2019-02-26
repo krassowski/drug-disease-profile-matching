@@ -29,6 +29,7 @@ install.packages('ggalluvial')
 install.packages('ggpubr')
 install.packages('shadowtext')
 install.packages('survminer')
+install.packages("cowplot")
 
 # why is that not a part of ggplot?
 install.packages('latex2exp')
