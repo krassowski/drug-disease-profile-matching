@@ -1,5 +1,6 @@
 import pickle
 from copy import copy
+from functools import partial
 from time import sleep
 from types import FunctionType
 from typing import List
@@ -17,23 +18,33 @@ from .reevaluation import reevaluate_benchmark
 
 def generate(
     randomizer: FunctionType, expression, samples_by_type, benchmark_partial, funcs,
-    *signatures, n=100, pickle_name=None, processes=None,
+    n=100, pickle_name=None, processes=None,
+    **kwargs
 ):
-    print('To abort permutations generation start, send keyboard interrupt now - waiting 5s')
-    sleep(5)
+    print('To abort permutations generation start, send keyboard interrupt now - waiting 2s')
+    sleep(2)
 
-    pool = Pool(processes)
     single_process_benchmark = copy(benchmark_partial)
     single_process_benchmark.keywords['processes'] = 1
     single_process_benchmark.keywords['progress'] = False
 
+    randomizer = partial(
+        randomizer,
+        **kwargs
+    )
+
     args = [
         expression,
         samples_by_type, single_process_benchmark,
-        funcs,
-        *signatures
+        funcs
     ]
-    permutations = list(pool.imap(randomizer, range(n), args))
+
+    #permutations = list(map(randomizer, range(n), args))
+
+    pool = Pool(processes)
+    permutations = list(
+        pool.imap(randomizer, range(n), args)
+    )
 
     if pickle_name:
         with open(f'{pickle_name}.pickle', 'wb') as f:

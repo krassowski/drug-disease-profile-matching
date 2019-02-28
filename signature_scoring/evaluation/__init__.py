@@ -131,6 +131,7 @@ def evaluation_summary(
 
     else:
         top_scoring = select_top_substance(vector, how=top)
+    """
 
     scores_indications, scores_controls, scores_unassigned, scores_contraindications = (
         aggregated_scores_by_group_label['indications'],
@@ -185,12 +186,14 @@ def evaluation_summary(
             for group, aggregated_scores in aggregated_scores_by_group_label.items()
         }
     )
+    """
 
     results = {
         'meta:Selected substances': len(top_scoring),
-        'meta:Scores': NeatNamespace(aggregated_scores_by_group_label),
+        'meta:Scores': NeatNamespace(aggregated_scores_by_group_label)
     }
 
+    """
     for category, metrics in metrics_manager.registry.items():
         category_scores = scores_dict.get(category, [])
         if category == 'overall' or len(category_scores):
@@ -198,6 +201,7 @@ def evaluation_summary(
                 key = f'{category}:{metric.name}'
                 assert key not in results
                 results[key] = metric(scores)
+    """
 
     return results
 

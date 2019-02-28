@@ -20,7 +20,8 @@ from .scores_models import Group
 
 def subtypes_benchmark(
     expression, samples_by_subtype, benchmark_function, funcs, *args,
-    samples_mapping=lambda x: x, use_all_controls=True, **kwargs
+    samples_mapping=lambda x: x, use_all_controls=True,
+    single_sample=True, multi_sample=True, **kwargs
 ):
     subtypes_results = {}
 
@@ -35,30 +36,38 @@ def subtypes_benchmark(
     for subtype, samples in samples_by_subtype.items():
 
         type_subset = expression[[samples_mapping(sample) for sample in samples]]
-        print(f'Using subset: {subtype} with {len(type_subset.columns)} samples')
-        if 'normal' not in type_subset.classes and not use_all_controls:
-            print(
-                'No normal subtype-specific samples to create differential expression, '
-                'set use_all_controls=True to include control samples from all subtypes.'
+
+        queries = {'query_signature': None}
+
+        if single_sample:
+            print(f'Using subset: {subtype} with {len(type_subset.columns)} samples')
+            if 'normal' not in type_subset.classes and not use_all_controls:
+                print(
+                    'No normal subtype-specific samples to create differential expression, '
+                    'set use_all_controls=True to include control samples from all subtypes.'
+                )
+                continue
+            differential_subset = type_subset.differential(
+                'tumor', 'normal',
+                only_paired=False,
+                **additional_controls
             )
-            continue
-        differential_subset = type_subset.differential(
-            'tumor', 'normal',
-            only_paired=False,
-            **additional_controls
-        )
+            if differential_subset is None:
+                print(f'Skipping subtype {subtype}')
+                continue
+            queries['query_signature'] = differential_subset
 
-        if use_all_controls:
-            absent_controls = all_controls.columns.difference(type_subset.columns)
-            type_subset = concat([type_subset, all_controls[absent_controls]], axis=1)
+        if multi_sample:
+            if use_all_controls:
+                absent_controls = all_controls.columns.difference(type_subset.columns)
+                type_subset = concat([type_subset, all_controls[absent_controls]], axis=1)
 
-        subset_with_controls = TCGAExpressionWithControls(type_subset)
+            subset_with_controls = TCGAExpressionWithControls(type_subset)
+            queries['query_expression'] = subset_with_controls
 
         subtypes_results[subtype] = benchmark_function(
             funcs,
-            query_signature=differential_subset,
-            query_expression=subset_with_controls,
-            *args, **kwargs
+            *args, **{**queries, **kwargs}
         )
 
     return subtypes_results

@@ -200,7 +200,10 @@ class SubstancesCollectionWithControls(SubstancesCollection, UserDict):
 
     @property
     def genes(self):
-        return self.get_attr('index')
+        if hasattr(self, 'stable_index') and self.stable_index:
+            return first(self.values()).index
+        else:
+            return self.get_attr('index')
 
     def groups_keys(self):
         return list(self.keys())
@@ -214,10 +217,13 @@ class SubstancesCollectionWithControls(SubstancesCollection, UserDict):
         }
 
     def drop_signatures(self, ids):
-        return SubstancesCollectionWithControls({
+        collection = SubstancesCollectionWithControls({
             signature_ids: signatures.drop(columns=set(signatures.columns) & set(ids))
             for signature_ids, signatures in self.items()
         })
+        if hasattr(self, 'stable_index'):
+            collection.stable_index = self.stable_index
+        return collection
 
     @classmethod
     def from_signatures(cls, signatures: SignaturesData):
@@ -230,5 +236,8 @@ class SubstancesCollectionWithControls(SubstancesCollection, UserDict):
         signatures_by_class = signatures.ordered_classes().reset_index().groupby('pert_iname').index.apply(list)
         for substance, signature_ids in signatures_by_class.items():
             data[tuple(signature_ids)] = SignaturesWithControls(signatures[signature_ids])
-        return cls(data)
+
+        collection = cls(data)
+        collection.stable_index = True
+        return collection
 
