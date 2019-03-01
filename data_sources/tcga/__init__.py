@@ -229,6 +229,18 @@ class TCGAExpression(DataSource):
 
     path_template = '{self.path}/gdac.broadinstitute.org_{cancer_type}.Merge_rnaseqv2__illuminahiseq_rnaseqv2__unc_edu__Level_3__RSEM_genes_normalized__data.Level_3.2016012800.0.0.tar.gz'
 
+    file_in_tar = (
+        'gdac.broadinstitute.org_{cancer_type}.'
+        'Merge_rnaseqv2__illuminahiseq_rnaseqv2'
+        '__unc_edu__Level_3__RSEM_genes_normalized__data.'
+        'Level_3.2016012800.0.0/'
+        '{cancer_type}.rnaseqv2__illuminahiseq_rnaseqv2'
+        '__unc_edu__Level_3__RSEM_genes_normalized__data.data.txt'
+    )
+
+    id_type = 'gene_id'
+    read_type = 'normalized_count'
+
     def __init__(self, path):
         self.path = path
 
@@ -239,46 +251,54 @@ class TCGAExpression(DataSource):
 
         with TarFile.open(path) as tar:
             member = tar.getmember(
-                f'gdac.broadinstitute.org_{cancer_type}.'
-                f'Merge_rnaseqv2__illuminahiseq_rnaseqv2'
-                f'__unc_edu__Level_3__RSEM_genes_normalized__data.'
-                f'Level_3.2016012800.0.0/'
-                f'{cancer_type}.rnaseqv2__illuminahiseq_rnaseqv2'
-                f'__unc_edu__Level_3__RSEM_genes_normalized__data.data.txt'
+                self.file_in_tar.format(cancer_type=cancer_type)
             )
             yield tar.extractfile(member)
 
-    def data(self, cancer_type, index='entrez_gene_id') -> Layer:
+    def data(self, cancer_type, index='entrez_gene_id', read_type=None) -> Layer:
+
+        read_type = read_type or self.read_type
 
         with self._get_expression_file(cancer_type) as f:
             # verify the first row which specifies the type of measurements
             mrna = read_table(f, index_col=0, nrows=1)
 
-            assert set(mrna.loc['gene_id']) == {'normalized_count'}
+            cols = (mrna.loc[self.id_type] == read_type)
+            types = set(mrna.loc[self.id_type])
+            if types != {read_type}:
+                print(f'Choosing {read_type} out of {types}')
+            assert set(types) & {read_type}
 
             f.seek(0)
 
             mrna = read_table(
                 f,
                 index_col=0,
+                usecols=[0] + [i + 1 for i, v in enumerate(cols) if v] if any(cols) else None,
                 skiprows=[1]  # skip the measurements row as this is the only non-numeric row which prevents pandas from
                 # correct casting of the value to float64
             )
 
-        mrna['hugo_symbol'], mrna['entrez_gene_id'] = mrna.index.str.split('|', 1).str
+            if types != {read_type}:
+                mrna.columns = [
+                    c[:-2] for c in mrna.columns
+                ]
 
-        possible_indices = ['hugo_symbol', 'entrez_gene_id']
-        assert index in possible_indices
+        if index != 'Hybridization REF':
+            mrna['hugo_symbol'], mrna['entrez_gene_id'] = mrna.index.str.split('|', 1).str
 
-        possible_indices.remove(index)
-        mrna = mrna.drop(columns=possible_indices, axis=1)
-        mrna = mrna.reset_index(drop=True).set_index(index)
+            possible_indices = ['hugo_symbol', 'entrez_gene_id']
+            assert index in possible_indices
 
-        for column in mrna.columns:
-            try:
-                assert mrna[column].dtype == numpy.float64
-            except AssertionError:
-                print(column)
+            possible_indices.remove(index)
+            mrna = mrna.drop(columns=possible_indices, axis=1)
+            mrna = mrna.reset_index(drop=True).set_index(index)
+
+            for column in mrna.columns:
+                try:
+                    assert mrna[column].dtype == numpy.float64
+                except AssertionError:
+                    print(column)
 
         return ExpressionManager(mrna, name=f'{cancer_type} expression')
 
@@ -289,9 +309,13 @@ class TCGAExpression(DataSource):
             mrna_index = read_table(f, usecols=[0], skiprows=[1], index_col=0)
 
         genes = {}
-        mrna_index.index.name = index
-        genes['hugo_symbol'], genes['entrez_gene_id'] = mrna_index.index.str.split('|', 1).str
-        return genes[index]
+
+        if index != 'Hybridization REF':
+            mrna_index.index.name = index
+            genes['hugo_symbol'], genes['entrez_gene_id'] = mrna_index.index.str.split('|', 1).str
+            return genes[index]
+        else:
+            return mrna_index.index
 
     def cohorts(self):
         """Returns cohorts with downloaded expression data"""
@@ -302,6 +326,23 @@ class TCGAExpression(DataSource):
             for path in glob(glob_path)
         ]
 
+    
+class miRNAExpression(TCGAExpression):
+    
+    path_template = '{self.path}//gdac.broadinstitute.org_{cancer_type}.Merge_mirnaseq__illuminahiseq_mirnaseq__bcgsc_ca__Level_3__miR_gene_expression__data.Level_3.2016012800.0.0.tar.gz'
+    
+    file_in_tar = (
+        'gdac.broadinstitute.org_{cancer_type}.Merge_mirnaseq__illuminahiseq_mirnaseq__bcgsc_ca__Level_3__miR_gene_expression__data.Level_3.2016012800.0.0/{cancer_type}.mirnaseq__illuminahiseq_mirnaseq__bcgsc_ca__Level_3__miR_gene_expression__data.data.txt'
+    )
+    id_type = 'miRNA_ID'
+    read_type = 'reads_per_million_miRNA_mapped'
+    
+    def genes(self, cancer_type, index='Hybridization REF'):
+        return super().genes(cancer_type, index)
+    
+    def data(self, cancer_type, index='Hybridization REF', read_type=read_type):
+        return super().data(cancer_type, index)
+    
 
 class TCGA(DataSource):
 
@@ -320,6 +361,10 @@ class TCGA(DataSource):
     @property
     def expression(self) -> TCGAExpression:
         return TCGAExpression(self.path)
+    
+    @property
+    def mirna_expression(self) -> miRNAExpression:
+        return miRNAExpression(self.path)
 
     def clinical(self, cancer_type, mode='simple') -> Layer:
         clinical_data = read_table(
