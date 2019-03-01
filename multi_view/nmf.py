@@ -1,18 +1,23 @@
-from pandas import DataFrame, concat
+from pandas import DataFrame, concat, Series
 from copy import deepcopy
 from sklearn.decomposition import NMF
 from sklearn.metrics.cluster import adjusted_rand_score
 from typing import Iterable
+from .layers import Layers
 
 
 class DecomposedMatrix:
     
-    def __init__(self, array, expected_clustering: DataFrame):
+    def __init__(self, array, index, expected_clustering: DataFrame):
         self.array = array
+        self.index = index
         self.expected_clustering = expected_clustering
     
     def predict_clusters(self) -> DataFrame:
-        clusters = DataFrame(self.array).idxmax(axis=1)
+        clusters = Series(
+            index=self.index,
+            data=DataFrame(self.array).idxmax(axis=1).values
+        )
         clusters = clusters.to_frame()
         clusters.columns = ['cluster']
         return clusters
@@ -53,7 +58,7 @@ class DecomposedMatrix:
 
 class MultiViewNMF:
     
-    def __init__(self, matrix=None, expected_clustering: list=None, **kwargs):
+    def __init__(self, matrix=None, expected_clustering: list = None, **kwargs):
         self.nmf = NMF(**kwargs)
         self.matrix = matrix
         self.expected_clustering = (
@@ -73,7 +78,6 @@ class MultiViewNMF:
     def _matrix_or_layers_or_own_matrix(self, matrix, layers):
         assert not (matrix is not None and layers is not None)
         if layers is not None:
-            from layers import Layers
             if isinstance(layers, Layers):
                 matrix = layers.to_df()
             else:
@@ -112,16 +116,14 @@ class MultiViewNMF:
         W = self.nmf.fit_transform(matrix)
         H = self.nmf.components_
         
-        return DecomposedMatrix(W, expected_clustering), DecomposedMatrix(W, expected_clustering)
+        return (
+            DecomposedMatrix(
+                W, matrix.index, expected_clustering
+            ),
+            DecomposedMatrix(
+                H, list(range(len(H))), expected_clustering
+            )
+        )
     
     def __repr__(self):
         return f'<MultiViewNMF of a matrix {self.matrix.shape}>'
-
-
-class NIMFA(MultiViewNMF):
-    
-    #nsmf = factorization.nmf.Nmf(data.values, rank=3, max_iter=400, n_run=1)
-    #nsmf.factorize()
-    #classes = nsmf.predict(what='features')
-    #return adjusted_rand_score(classes.tolist()[0], subtypes.subtype)
-    pass
