@@ -63,17 +63,44 @@ def normalize_scores(scores, rescale: bool, by_cell: bool):
 
     scores['raw_score'] = scores.score
 
+    func_masks = {
+        func: scores.func == func
+        for func in scores.func.unique()
+    }
+
     if by_cell:
         pos_mean_scores_by_cell = scores[scores.score > 0].groupby(['func', 'cell_id']).score.mean().to_dict()
         neg_mean_scores_by_cell = scores[scores.score < 0].groupby(['func', 'cell_id']).score.mean().to_dict()
-        scores['score'] = scores.apply(
-            lambda r: (
-                r.score / pos_mean_scores_by_cell[r.func, r.cell_id]
-                if r.score > 0 else
-                -r.score / neg_mean_scores_by_cell[r.func, r.cell_id]
-            ),
-            axis=1
-        )
+
+        # 2.49 s
+        positive = scores.score > 0
+        s_loc = 'score'
+
+        cell_masks = {
+            cell_id: scores.cell_id == cell_id
+            for cell_id in scores.cell_id.unique()
+        }
+
+        for sign, reference, leg in [
+            (+1, pos_mean_scores_by_cell, positive),
+            (-1, neg_mean_scores_by_cell, ~positive)
+        ]:
+            for func, mask in func_masks.items():
+                leg_and_func = leg & mask
+                for cell_id in scores.cell_id.unique():
+                    denominator = reference[func, cell_id] * sign
+                    loc = leg_and_func & cell_masks[cell_id]
+                    scores.loc[loc, s_loc] = scores.loc[loc, s_loc] / denominator
+
+        # 4.63 s
+        # scores['score'] = scores.apply(
+        #     lambda r: (
+        #         r.score / pos_mean_scores_by_cell[r.func, r.cell_id]
+        #         if r.score > 0 else
+        #         -r.score / neg_mean_scores_by_cell[r.func, r.cell_id]
+        #     ),
+        #     axis=1
+        # )
 
     if rescale:
         # feature scaling
@@ -82,9 +109,17 @@ def normalize_scores(scores, rescale: bool, by_cell: bool):
         scores_range = (
             scores_by_func.max() - scores_by_func.min()
         ).to_dict()
-        scores.score = scores.apply(lambda r: (
-            -1 + (r.score - scores_min[r.func]) * 2 / scores_range[r.func]
-        ), axis=1)
+
+        # 303 ms
+        for func, mask in func_masks.items():
+            scores.loc[mask, 'score'] = (
+                -1 + (scores.loc[mask, 'score'] - scores_min[func]) * 2 / scores_range[func]
+            )
+
+        # 2.49 s
+        # scores.score = scores.apply(lambda r: (
+        #    -1 + (r.score - scores_min[r.func]) * 2 / scores_range[r.func]
+        # ), axis=1)
 
     return scores
 
