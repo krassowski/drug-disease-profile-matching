@@ -12,7 +12,7 @@ if (!requireNamespace("BiocManager", quietly = TRUE))
 BiocManager::install("GSVA", version = "3.8")
 BiocManager::install("limma", version = "3.8")
 
-# PanCancerAtlas - stratification retrival
+# PanCancerAtlas - stratification retrieval
 BiocManager::install("TCGAbiolinks", version = "3.8")
 
 BiocManager::install("PharmacoGx", version = "3.8")
@@ -28,8 +28,8 @@ install.packages('ggbeeswarm')
 install.packages('ggalluvial')
 install.packages('ggpubr')
 install.packages('shadowtext')
-install.packages('survminer')
 install.packages("cowplot")
+install.packages('tidytext')
 
 # why is that not a part of ggplot?
 install.packages('latex2exp')
