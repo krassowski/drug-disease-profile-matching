@@ -36,6 +36,7 @@ class DrugConnectivityMap(DataSource):
         }
         self.sig_info = read_table(dataset_path + '/GSE92742_Broad_LINCS_sig_info.txt.gz', low_memory=False)
         self.sig_info_sig_id = self.sig_info.set_index('sig_id')
+        self.pert_info = read_table(dataset_path + '/GSE92742_Broad_LINCS_pert_info.txt.gz', low_memory=False)
 
     def signatures_treated_with(self, substance: str, pert_id=False):
         return self.metadata_for_perturbation(substance, pert_id=pert_id).sig_id
