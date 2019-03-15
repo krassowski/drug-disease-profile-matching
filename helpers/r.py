@@ -55,11 +55,38 @@ def data_frame_from_matrix(matrix):
         index=rows_names
     )
 
+from rpy2.rinterface import RNULLType
 
 def one_or_all(x):
-    if len(x) == 1:
-        return x[0]
+    try:
+        if len(x) == 1:
+            return x[0]
+    except TypeError:
+        pass
     return x
+
+
+def r_test(test_name):
+    def run_r_test(x, y, **kwargs):
+        if len(x) < 2 or len(y) < 2:
+            return {'p.value': 1}
+        from pandas import Series
+        try:
+            result = r[test_name](p2r(Series(x)), p2r(Series(y)), **kwargs)
+        except RRuntimeError:
+            print(x)
+            print(y)
+            print(kwargs)
+            raise
+        return {
+            key: one_or_all(value)
+            for key, value in result.items()
+        }
+    run_r_test.__name__ == test_name
+    return run_r_test
+
+ks_test = r_test('ks.test')
+wilcox_test = r_test('wilcox.test')
 
 
 def r_ks_test(x, y, **kwargs):

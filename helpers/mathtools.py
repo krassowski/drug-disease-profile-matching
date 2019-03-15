@@ -25,3 +25,8 @@ def split_to_pos_and_neg(values):
         i += 1
 
     return up_i[:u], down_i[:d]
+
+
+def one(x: list):
+    assert len(x) == 1
+    return x[0]
