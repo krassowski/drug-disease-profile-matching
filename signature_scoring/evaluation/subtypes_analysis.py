@@ -2,7 +2,7 @@ from copy import copy
 from glob import glob
 from warnings import warn
 
-from pandas import Categorical, concat
+from pandas import Categorical, concat, DataFrame
 
 from signature_scoring.evaluation import permutations
 from signature_scoring.evaluation.analysis import compute_metrics_by_func, normalize_scores
@@ -33,7 +33,15 @@ def scores_from_subtypes(stratification_result, by_cell):
 def get_all_scores(results, by_cell):
     scores_all_stratifications = []
     for stratification, stratification_result in results.items():
-        scores = scores_from_subtypes(stratification_result, by_cell=by_cell)
+
+        results_with_scores = {}
+        for subtype in stratification_result:
+            if 'meta:Scores' in stratification_result[subtype]:
+                results_with_scores[subtype] = stratification_result[subtype]
+            else:
+                warn(f'{subtype} of {stratification} has no scores for this permutation')
+
+        scores = scores_from_subtypes(results_with_scores, by_cell=by_cell)
         scores_all_stratifications.append(
             scores.assign(stratification=stratification)
         )
@@ -41,10 +49,17 @@ def get_all_scores(results, by_cell):
 
 
 def aggregate_scores_per_substance_strat_func(scores_with_reference, trans='max'):
-    scores_max = copy(scores_with_reference)
-    scores_max['score'] = scores_max.groupby(['func', 'pert_iname', 'stratification'])['score'].transform(trans)
-    scores_max = scores_max[scores_max.columns.difference(['pert_idose', 'cell_id', 'subtype'])].drop_duplicates()
-    return scores_max
+    by = ['func', 'pert_iname', 'stratification']
+
+    df: DataFrame = copy(scores_with_reference)
+
+    transformed_scores = df.groupby(by).score.transform(trans)
+    df.score = transformed_scores
+
+    df = df[df.columns.difference(['pert_idose', 'cell_id', 'subtype', 'raw_score'])]
+    df = df.drop_duplicates()
+
+    return df
 
 
 def metrics_by_stratification(scores_with_stratification):

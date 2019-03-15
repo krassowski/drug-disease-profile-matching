@@ -1,10 +1,9 @@
-from collections import defaultdict
 from functools import partial
 from types import SimpleNamespace
 from warnings import warn
 
 from numpy import isclose
-from pandas import DataFrame, Series, Categorical
+from pandas import DataFrame, Series
 from pandas.core.dtypes.common import is_numeric_dtype
 
 from data_frames import to_nested_dicts, the_only_one
@@ -55,7 +54,6 @@ def extract_scores_from_result(
         for group_metadata, group_scores in iter_groups(func_scores):
             # group: indications / contra / controls
             for group, score_series in group_scores.__dict__.items():
-
                 for row in row_details(score_series):
                     data.append({
                         'func': func,

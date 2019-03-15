@@ -30,21 +30,33 @@ def distance_matrix(scores, normalize=True, distance=ks_distance, condensed=True
     return matrix
 
 
-def compute_metrics(known_status, expected='is_indication'):
+def compute_metrics(known_status, expected='is_indication', check_ranges=True):
     comparison = NeatNamespace(
         expected=list(known_status[expected]),
         observed=known_status.score
     )
+    
+    if check_ranges:
+        try:
+            assert known_status.score.min() >= -1 and known_status.score.max() <= 1
+            assert known_status.score.min() < 0
+        except:
+            print('Make sure the scores are -1/+1')
 
     return {
         'auc': generalized_roc_auc_score(comparison),
-        'log_loss': log_loss(known_status[expected].tolist(), known_status.score.tolist()),
+        'log_loss': log_loss(
+            known_status[expected].tolist(),
+            (
+                (known_status.score + 1)
+                / 2
+            ).tolist()),
         'auc0.01': generalized_roc_auc_score(comparison, max_fpr=0.01),
         'auc0.1': generalized_roc_auc_score(comparison, max_fpr=0.1)
     }
 
 
-def compute_metrics_by_func(scores, without_unassigned):
+def compute_metrics_by_func(scores, without_unassigned, check_ranges=True):
     metrics_by_func = []
     for func in scores.func.unique():
         func_scores = scores[scores.func == func]
@@ -52,7 +64,7 @@ def compute_metrics_by_func(scores, without_unassigned):
             known_scores = func_scores[func_scores.group != 'unassigned']
             func_scores = known_scores
         metrics_by_func.append(
-            {'func': func, **compute_metrics(func_scores)}
+            {'func': func, **compute_metrics(func_scores, check_ranges=check_ranges)}
         )
     return DataFrame(metrics_by_func)
 
@@ -87,6 +99,8 @@ def normalize_scores(scores, rescale: bool, by_cell: bool):
         ]:
             for func, mask in func_masks.items():
                 leg_and_func = leg & mask
+                if not leg_and_func.any():
+                    continue
                 for cell_id in scores.cell_id.unique():
                     denominator = reference[func, cell_id] * sign
                     loc = leg_and_func & cell_masks[cell_id]
