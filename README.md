@@ -55,18 +55,16 @@ stratifications of breast cancer (including three based on multi-omics data): PA
 
 
 #### Results
-Ability of profile matching approaches to recover known drugs (as previously reported) is confirmed.
-
-A few previously unreported breast-cancer drug candidates are highlighted.
-
-The advantages and disadvantages of proposed indications-contraidications classification use (with many cancer drugs being known carcinogens) is discussed.
-
-GSE-based methods require large numbers of samples, high-performance computing facilities and may not increase the chances of drug recovery in certain circumstances.
+- The ability of profile matching approaches to recover known drugs (as previously reported) is confirmed.
+- A few previously unreported breast-cancer drug candidates are highlighted.
+- The advantages and disadvantages of proposed indications-contraidications classification use.
+- Multiple cancer drugs are noted to be known carcinogenic substances
+- GSE-based methods require large numbers of samples, high-performance computing facilities and may not increase the chances of drug recovery in certain circumstances.
 
 While the results obtained with meaningful stratifications do not always perform better than random permutations,
 limited benefit of stratification is observed for the drug recovery performance, with promising results from XSum and mROAST scoring functions.
 
-Despite no definite evidence for superiority of multi-omics stratifications use for classification of drug indications/contraindications,
+Despite no definite evidence for superiority of multi-omics stratifications use for classification of drug indications-contraindications,
 two multi-omics stratifications are highlighted as performing better than others: PARADIGM and Pan-Gyn.
 
 ### Setup and requirements
@@ -77,7 +75,7 @@ Recommended packages for Ubuntu can be installed with:
 bash ubuntu_setup.sh
 ```
 
-Python in version 3.7 is recommended (or at least CPython implementation of Python 3.6). To install the required Python packages run:
+Python in version 3.7 is recommended (minimum CPython 3.6). To install the required Python packages run:
 
 ```bash
 pip3 install -r requirements.txt
@@ -121,8 +119,7 @@ For example, to download TCGA data use:
 bash data/tcga/download.sh
 ```
 
-If you strive to reproduce only part of the findings,
-you may want to limit the download to required data sources due to large file sizes.
+If you wish to reproduce only part of the findings, you may want to download only required sources due to large file sizes.
 
 
 ### Acknowledgements
