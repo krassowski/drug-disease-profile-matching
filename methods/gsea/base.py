@@ -8,11 +8,11 @@ from typing import Set
 from warnings import warn
 
 from pandas import DataFrame
+from jupyter_helpers.following_tail import FollowingTail
 
 from better_abc import ABC, abstract_method, abstract_property
 
 from data_sources.molecular_signatures_db import MolecularSignaturesDatabase
-from helpers.gui import OutputNAtATime
 from helpers.streams import handle_streams
 from signature_scoring.models.with_controls import ExpressionWithControls
 
@@ -31,12 +31,12 @@ class GSEA(ABC):
     @staticmethod
     def get_display(display):
         if not display:
-            display = OutputNAtATime()
+            display = FollowingTail()
         return display
 
     def prepare_output(self):
         self.display = self.get_display(self._original_display)
-        if isinstance(self.display, OutputNAtATime):
+        if isinstance(self.display, FollowingTail):
             self.display.activate()
 
     @staticmethod

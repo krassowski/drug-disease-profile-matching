@@ -17,8 +17,8 @@ from metrics import signal_to_noise, signal_to_noise_vectorized
 from models import ExpressionProfile
 from helpers.r import importr, r2p
 
-from layers import MutationLayer, ExpressionLayer
-from layers import Layer
+from multi_view.layers import MutationLayer, ExpressionLayer
+from multi_view.layers import Layer
 from layers_data import LayerData, LayerDataWithSubsets, Subset, MutationAnnotations
 
 from .barcode import TCGABarcode

@@ -38,3 +38,4 @@ statsmodels
 dataclasses
 nbimporter
 plotnine
+jupyter-helpers

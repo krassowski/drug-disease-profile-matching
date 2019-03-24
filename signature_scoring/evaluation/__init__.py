@@ -7,10 +7,10 @@ from functools import partial
 from pandas import DataFrame, concat, Series
 import pandas
 from operator import attrgetter
+from jupyter_helpers.namespace import NeatNamespace
 
 from data_frames import is_copy
 from data_sources.drug_connectivity_map import Scores, dcm, AggregatedScores
-from helpers.gui.namespace import NeatNamespace
 from helpers import WarningManager
 
 from .. import score_signatures

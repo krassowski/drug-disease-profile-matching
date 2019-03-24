@@ -1,6 +1,6 @@
 from functools import reduce
 
-from helpers.gui.source import get_source
+from jupyter_helpers.source import get_source
 
 
 def source_for_table(obj, trim_first_decorator=False, type_hints=True):

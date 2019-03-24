@@ -2,7 +2,7 @@ import re
 
 from pandas import DataFrame, Series
 
-from helpers.gui.namespace import HorizontalNamespace
+from jupyter_helpers.namespace import HorizontalNamespace
 from helpers.cache import power_hash
 
 

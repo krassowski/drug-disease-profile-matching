@@ -2,7 +2,7 @@ from pandas import crosstab
 
 from data_frames import AugmentedDataFrame
 from helpers.cache import cached_property
-from layers import Layer, CodingMutationLayer, MutationLayer
+from multi_view.layers import Layer, CodingMutationLayer, MutationLayer
 
 
 class LayerDataSubset:
