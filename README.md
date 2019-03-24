@@ -2,8 +2,6 @@
 
 Multi-omics disease sub-type specific drug repositioning aided with expression signatures from ConnectivityMap.
 
-An MRes research project at Imperial College London.
-
 ### Overview
 
 ![](/images/profiles_and_expression.png?raw=true)
@@ -13,7 +11,7 @@ An MRes research project at Imperial College London.
 ![](/images/stratifications.png?raw=true)
 
 
-### Abstract
+### Structured abstract
 
 #### Background
 Attempts to guide the selection of drug candidates with machine learning has increased in recent years.
@@ -71,7 +69,71 @@ limited benefit of stratification is observed for the drug recovery performance,
 Despite no definite evidence for superiority of multi-omics stratifications use for classification of drug indications/contraindications,
 two multi-omics stratifications are highlighted as performing better than others: PARADIGM and Pan-Gyn.
 
+### Setup and requirements
+
+Recommended packages for Ubuntu can be installed with:
+
+```bash
+bash ubuntu_setup.sh
+```
+
+Python in version 3.7 is recommended (or at least CPython implementation of Python 3.6). To install the required Python packages run:
+
+```bash
+pip3 install -r requirements.txt
+```
+
+R in version 3.5.1 is required; the dependencies can be easily installed with:
+
+```bash
+Rscript install.R
+```
+
+Finally, two major third-party applications (GSEA from Broad Institute, and custom fork of cudaGSEA) can be installed with:
+
+```bash
+cd thirdparty
+bash download.sh
+```
+
+cudaGSEA needs to be compiled with:
+
+```bash
+./thirdparty/cudaGSEA/cudaGSEA/src/compile
+```
+
+#### Testing
+
+Limited number of unit tests is included and can be run to verify
+corresponding application fragments and integrity of the installation with:
+
+```bash
+./run_tests.sh
+```
+
+### Data
+
+Each of the data sources has corresponding subdirectory (in `data` directory)
+containing `download.sh` script, which will download the required data.
+For example, to download TCGA data use:
+
+```bash
+bash data/tcga/download.sh
+```
+
+If you strive to reproduce only part of the findings,
+you may want to limit the download to required data sources due to large file sizes.
+
 
 ### Acknowledgements
 
 The cells, RNA, DNA and histone pictograms are derivative works based on graphics from [Reactome Icon Library](https://reactome.org/icon-lib) (licensed under [Creative Commons Attribution 4.0 International License](https://creativecommons.org/licenses/by-sa/4.0/)).
+
+### About
+
+The code in this repository was written as a part of MRes research project at Imperial College London.
+The research was conducted under supervision of Dr Paul-Michael Agapow.
+
+### References
+
+TBD
