@@ -21,7 +21,7 @@ Comparison of genes expression profiles (perturbation profiles) after treatment 
 is a well-established approach to generate compound similarity maps for GBA methods. Large-scale projects, such as The Connectivity Map, offer ways of systematic perturbagene screening.
 
 It was proposed that the perturbation profiles may be also used to find drug candidates by matching the profiles against
-differential expression patterns of diseases (being a simpler alternative to advanced machine-learning methods).
+differential expression profiles of diseases (being a simpler alternative to advanced machine-learning methods). This approach is referred to as pattern- or profile-matching and in the simplest setting corresponds to searching for anticorrelation of drug-disease profiles.
 
 Previous studies demonstrated the merits of multi-omics disease stratification, evaluating the predictive ability
 of novel clusters for cancer patients survival or analyzing the functional enrichment in the clusters.
