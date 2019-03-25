@@ -67,6 +67,16 @@ limited benefit of stratification is observed for the drug recovery performance,
 Despite no definite evidence for the superiority of multi-omics stratifications use for classification of drug indications-contraindications,
 two multi-omics stratifications are highlighted as performing better than others: PARADIGM and Pan-Gyn.
 
+
+### Graphical results summary
+
+![](images/poster_results/figure_1.png?raw=true)
+
+![](images/poster_results/figures_2_3.png?raw=true)
+
+![](images/poster_results/figures_4_5.png?raw=true)
+
+
 ### Setup and requirements
 
 Recommended packages for Ubuntu can be installed with:
