@@ -39,3 +39,5 @@ dataclasses
 nbimporter
 plotnine
 jupyter-helpers
+enhanced_multiprocessing
+gsea_api

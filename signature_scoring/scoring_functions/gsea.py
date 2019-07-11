@@ -8,11 +8,11 @@ from pandas import concat
 from data_frames import AugmentedDataFrame
 from data_sources.molecular_signatures_db import MolecularSignaturesDatabase
 from helpers.temp import create_tmp_dir
-from methods.gsea import cudaGSEA
-from methods.gsea.base import GSEA
-from methods.gsea.exceptions import GSEAError, GSEANoResults
-from methods.gsea.java import GSEADesktop
-from multiprocess.cache_manager import multiprocess_cache_manager
+from gsea_api.gsea import cudaGSEA
+from gsea_api.gsea.base import GSEA
+from gsea_api.gsea.exceptions import GSEAError, GSEANoResults
+from gsea_api.gsea.java import GSEADesktop
+from enhanced_multiprocessing.cache_manager import multiprocess_cache_manager
 
 from ..models import Profile
 from ..models.with_controls import ExpressionWithControls, DummyExpressionsWithControls

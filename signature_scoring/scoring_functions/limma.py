@@ -7,7 +7,7 @@ from rpy2.robjects import StrVector, ListVector
 from rpy2.robjects.packages import importr
 
 from data_sources.molecular_signatures_db import MolecularSignaturesDatabase
-from multiprocess.cache_manager import multiprocess_cache_manager
+from enhanced_multiprocessing.cache_manager import multiprocess_cache_manager
 
 from ..models.with_controls import ExpressionWithControls
 from . import scoring_function

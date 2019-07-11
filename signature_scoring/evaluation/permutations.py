@@ -10,7 +10,7 @@ from pandas import DataFrame, concat, Series
 from tqdm.auto import tqdm
 
 
-from multiprocess import Pool
+from enhanced_multiprocessing import Pool
 
 from .display import choose_columns, maximized_metrics, minimized_metrics
 from .reevaluation import reevaluate_benchmark

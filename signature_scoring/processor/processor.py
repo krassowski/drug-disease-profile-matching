@@ -6,8 +6,8 @@ from tqdm import tqdm
 from data_sources.drug_connectivity_map import Scores, dcm
 from helpers import first, WarningManager
 
-from multiprocess import Pool
-from multiprocess.cache_manager import multiprocess_cache_manager
+from enhanced_multiprocessing import Pool
+from enhanced_multiprocessing.cache_manager import multiprocess_cache_manager
 
 from ..models import Signature, Profile, SignaturesGrouping
 from ..scoring_functions import ScoringFunction
