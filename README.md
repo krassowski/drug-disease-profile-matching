@@ -138,6 +138,8 @@ The cells, RNA, DNA and histone pictograms are derivative works based on graphic
 
 ### About
 
+[![DOI](https://zenodo.org/badge/162146517.svg)](https://zenodo.org/badge/latestdoi/162146517)
+
 The code in this repository was written as a part of MRes research project at Imperial College London.
 The research was conducted under the supervision of Dr Paul-Michael Agapow.
 
